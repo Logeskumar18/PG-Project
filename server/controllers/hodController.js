@@ -1,3 +1,31 @@
+// HOD: Reassign student to another staff (update createdByStaffId)
+export const reassignStudentToStaff = async (req, res) => {
+  try {
+    const { studentId } = req.params;
+    const { staffId } = req.body;
+    // Validate staff exists
+    const staff = await Staff.findById(staffId);
+    if (!staff) {
+      return res.status(404).json({ status: 'error', message: 'Staff not found' });
+    }
+    // Update student ownership
+    const student = await Student.findByIdAndUpdate(
+      studentId,
+      { createdByStaffId: staffId },
+      { new: true }
+    ).select('name email studentId department createdByStaffId');
+    if (!student) {
+      return res.status(404).json({ status: 'error', message: 'Student not found' });
+    }
+    res.json({
+      status: 'success',
+      message: 'Student reassigned to staff successfully',
+      data: student
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
 import Project from '../models/Project.js';
 import Document from '../models/Document.js';
 import Milestone from '../models/Milestone.js';
@@ -5,16 +33,17 @@ import Student from '../models/Student.js';
 import Staff from '../models/Staff.js';
 import Announcement from '../models/Announcement.js';
 
+
 // Get dashboard overview for HOD
 export const getDashboardOverview = async (req, res) => {
   try {
     const totalProjects = await Project.countDocuments();
-    const totalStudents = await Student.countDocuments();
-    const totalStaff = await Staff.countDocuments();
+    const totalStudents = await Student.countDocuments({ isActive: true });
+    const totalStaff = await Staff.countDocuments({ isActive: true });
     const pendingApprovals = await Project.countDocuments({ approvalStatus: 'Pending' });
     const approvedProjects = await Project.countDocuments({ approvalStatus: 'Approved' });
     const completedProjects = await Project.countDocuments({ status: 'Completed' });
-    
+
     // Get projects by status
     const projectsByStatus = await Project.aggregate([
       {
@@ -57,7 +86,7 @@ export const getDashboardOverview = async (req, res) => {
 export const getAllProjects = async (req, res) => {
   try {
     const { status, approvalStatus } = req.query;
-    
+
     const filter = {};
     if (status) filter.status = status;
     if (approvalStatus) filter.approvalStatus = approvalStatus;
@@ -148,7 +177,7 @@ export const assignGuideToProject = async (req, res) => {
     const { guideId } = req.body;
 
     // Verify guide exists and is a staff member
-    const guide = await User.findOne({ _id: guideId, role: 'Staff' });
+    const guide = await Staff.findById(guideId);
     if (!guide) {
       return res.status(404).json({
         status: 'error',
@@ -176,11 +205,55 @@ export const assignGuideToProject = async (req, res) => {
   }
 };
 
+// Create new staff member
+export const createStaff = async (req, res) => {
+  try {
+    const { name, email, employeeId, password, department, phone } = req.body;
+
+    // Check if staff already exists
+    const existingStaff = await Staff.findOne({
+      $or: [{ email }, { employeeId }]
+    });
+
+    if (existingStaff) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'Staff member with this email or ID already exists'
+      });
+    }
+
+    const staff = await Staff.create({
+      name,
+      email,
+      employeeId,
+      password,
+      department,
+      phone,
+      isActive: true
+    });
+
+    // Remove password from response
+    staff.password = undefined;
+
+    res.status(201).json({
+      status: 'success',
+      message: 'Staff member created successfully',
+      data: staff
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
 // Get all staff members
 export const getAllStaff = async (req, res) => {
   try {
-    const staff = await Staff.find()
-      .select('name email employeeId department phone')
+    const staff = await Staff.find({ isActive: true })
+      .select('name email employeeId department phone isActive')
       .sort({ name: 1 });
 
     // Get project count for each staff
@@ -209,8 +282,8 @@ export const getAllStaff = async (req, res) => {
 // Get all students
 export const getAllStudents = async (req, res) => {
   try {
-    const students = await Student.find()
-      .select('name email studentId department phone')
+    const students = await Student.find({ isActive: true })
+      .select('name email studentId department phone isActive')
       .sort({ studentId: 1 });
 
     // Get project info for each student
@@ -332,7 +405,8 @@ export const createAnnouncement = async (req, res) => {
       type,
       targetAudience,
       deadline,
-      createdBy: req.user._id
+      createdBy: req.user._id,
+      createdByUserModel: req.user.role
     });
 
     await announcement.save();

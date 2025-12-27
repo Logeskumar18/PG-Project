@@ -51,12 +51,12 @@ const MessagesPage = () => {
   };
 
   return (
-    <div className="min-vh-100" style={{background: '#f8f9fa'}}>
+    <div className="min-vh-100" style={{ background: '#f8f9fa' }}>
       {/* Navbar */}
       <div className="bg-white shadow-sm py-3 sticky-top">
         <Container fluid className="px-4">
           <div className="d-flex justify-content-between align-items-center">
-            <h4 className="fw-bold mb-0" style={{color: '#667eea'}}>✉️ Messages</h4>
+            <h4 className="fw-bold mb-0" style={{ color: '#667eea' }}>✉️ Messages</h4>
             <div className="d-flex gap-2 align-items-center">
               <Badge bg="danger" pill>{unreadCount}</Badge>
               <Button variant="primary" onClick={() => setShowComposeModal(true)}>
@@ -102,7 +102,7 @@ const MessagesPage = () => {
                 </div>
 
                 {/* Conversations/Messages List */}
-                <ListGroup variant="flush" style={{maxHeight: '70vh', overflowY: 'auto'}}>
+                <ListGroup variant="flush" style={{ maxHeight: '70vh', overflowY: 'auto' }}>
                   {activeTab === 'inbox' && conversations.map(conv => (
                     <ListGroup.Item
                       key={conv.id}
@@ -115,7 +115,7 @@ const MessagesPage = () => {
                         <div className="flex-grow-1">
                           <div className="d-flex align-items-center gap-2 mb-1">
                             <strong>{conv.userName}</strong>
-                            <Badge bg="secondary" pill style={{fontSize: '10px'}}>
+                            <Badge bg="secondary" pill style={{ fontSize: '10px' }}>
                               {conv.userRole}
                             </Badge>
                             {conv.unreadCount > 0 && (
@@ -168,7 +168,7 @@ const MessagesPage = () => {
                     </Button>
                   </div>
                 </Card.Header>
-                <Card.Body style={{maxHeight: '60vh', overflowY: 'auto'}}>
+                <Card.Body style={{ maxHeight: '60vh', overflowY: 'auto' }}>
                   {messages.filter(m => m.senderId === selectedConversation.userId).map(msg => (
                     <div key={msg.id} className="mb-4">
                       <div className="d-flex justify-content-between align-items-start mb-2">

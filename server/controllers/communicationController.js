@@ -1,6 +1,9 @@
 import Message from '../models/Message.js';
 import Notification from '../models/Notification.js';
-import User from '../models/User.js';
+
+import Student from '../models/Student.js';
+import Staff from '../models/Staff.js';
+import HOD from '../models/HOD.js';
 import Announcement from '../models/Announcement.js';
 
 // ============ MESSAGE CONTROLLERS ============
@@ -10,16 +13,34 @@ export const sendMessage = async (req, res) => {
   try {
     const { receiverId, subject, message, priority, relatedTo } = req.body;
     const senderId = req.user._id;
+    const senderRole = req.user.role; // 'Student', 'Staff', or 'HOD'
 
-    // Check if receiver exists
-    const receiver = await User.findById(receiverId);
+    // Check if receiver exists and determine role
+    let receiver = null;
+    let receiverRole = null;
+
+    receiver = await Student.findById(receiverId);
+    if (receiver) receiverRole = 'Student';
+
+    if (!receiver) {
+      receiver = await Staff.findById(receiverId);
+      if (receiver) receiverRole = 'Staff';
+    }
+
+    if (!receiver) {
+      receiver = await HOD.findById(receiverId);
+      if (receiver) receiverRole = 'HOD';
+    }
+
     if (!receiver) {
       return res.status(404).json({ message: 'Receiver not found' });
     }
 
     const newMessage = await Message.create({
       senderId,
+      senderModel: senderRole,
       receiverId,
+      receiverModel: receiverRole,
       subject,
       message,
       priority: priority || 'Medium',
@@ -27,8 +48,8 @@ export const sendMessage = async (req, res) => {
     });
 
     const populatedMessage = await Message.findById(newMessage._id)
-      .populate('senderId', 'name email role')
-      .populate('receiverId', 'name email role');
+      .populate('senderId', 'name email')
+      .populate('receiverId', 'name email');
 
     // Create notification for receiver
     await createNotification({
@@ -66,13 +87,31 @@ export const getInboxMessages = async (req, res) => {
       .populate('receiverId', 'name email role')
       .sort({ createdAt: -1 })
       .limit(limit * 1)
-      .skip((page - 1) * limit);
+      .skip((page - 1) * limit)
+      .lean();
 
     const total = await Message.countDocuments(query);
 
+    // Manually populate if automatic population failed (e.g. missing senderModel)
+    const populatedMessages = await Promise.all(messages.map(async (msg) => {
+      // If senderId is not an object (not populated), try to find it
+      if (!msg.senderId || !msg.senderId._id) {
+        const senderId = msg.senderId;
+        // Try finding in all collections
+        const sender = await Student.findById(senderId).select('name email role department') ||
+          await Staff.findById(senderId).select('name email role department') ||
+          await HOD.findById(senderId).select('name email role department');
+
+        if (sender) {
+          msg.senderId = sender;
+        }
+      }
+      return msg;
+    }));
+
     res.json({
       success: true,
-      data: messages,
+      data: populatedMessages,
       totalPages: Math.ceil(total / limit),
       currentPage: parseInt(page),
       total
@@ -124,13 +163,15 @@ export const getMessageById = async (req, res) => {
     }
 
     // Check if user is sender or receiver
-    if (message.senderId._id.toString() !== userId.toString() && 
-        message.receiverId._id.toString() !== userId.toString()) {
+    const senderIdStr = message.senderId._id ? message.senderId._id.toString() : message.senderId.toString();
+    const receiverIdStr = message.receiverId._id ? message.receiverId._id.toString() : message.receiverId.toString();
+
+    if (senderIdStr !== userId.toString() && receiverIdStr !== userId.toString()) {
       return res.status(403).json({ message: 'Unauthorized to view this message' });
     }
 
     // Mark as read if receiver is viewing
-    if (message.receiverId._id.toString() === userId.toString() && !message.isRead) {
+    if (receiverIdStr === userId.toString() && !message.isRead) {
       message.isRead = true;
       message.readAt = new Date();
       await message.save();
@@ -179,8 +220,8 @@ export const deleteMessage = async (req, res) => {
     }
 
     // Only sender or receiver can delete
-    if (message.senderId.toString() !== userId.toString() && 
-        message.receiverId.toString() !== userId.toString()) {
+    if (message.senderId.toString() !== userId.toString() &&
+      message.receiverId.toString() !== userId.toString()) {
       return res.status(403).json({ message: 'Unauthorized' });
     }
 
@@ -363,7 +404,7 @@ export const getConversation = async (req, res) => {
   }
 };
 
-// Get all conversations (list of users you've messaged with)
+// Get all conversations
 export const getConversationsList = async (req, res) => {
   try {
     const userId = req.user._id;
@@ -400,32 +441,46 @@ export const getConversationsList = async (req, res) => {
         }
       },
       {
-        $lookup: {
-          from: 'users',
-          localField: '_id',
-          foreignField: '_id',
-          as: 'user'
-        }
-      },
-      {
-        $unwind: '$user'
-      },
-      {
-        $project: {
-          userId: '$_id',
-          userName: '$user.name',
-          userEmail: '$user.email',
-          userRole: '$user.role',
-          lastMessage: 1,
-          unreadCount: 1
-        }
-      },
-      {
         $sort: { 'lastMessage.createdAt': -1 }
       }
     ]);
 
-    res.json({ success: true, data: conversations });
+    // Populate user details manually since we can't lookup a single collection
+    const populatedConversations = await Promise.all(conversations.map(async (conv) => {
+      const otherUserId = conv._id;
+      let user = null;
+      let role = null;
+
+      // Try finding user in all collections
+      // Optimization: use lastMessage model hint if new architecture, 
+      // but here we just try-find or check if we know the role
+
+      // Since we don't store "otherUserModel" in the conversation ID, we have to search
+      // But we can check senderModel/receiverModel from lastMessage!
+      const isSender = conv.lastMessage.senderId.toString() === userId.toString();
+      const model = isSender ? conv.lastMessage.receiverModel : conv.lastMessage.senderModel;
+
+      if (model === 'Student') user = await Student.findById(otherUserId);
+      else if (model === 'Staff') user = await Staff.findById(otherUserId);
+      else if (model === 'HOD') user = await HOD.findById(otherUserId);
+      else {
+        // Fallback for old messages without model
+        user = await Student.findById(otherUserId) ||
+          await Staff.findById(otherUserId) ||
+          await HOD.findById(otherUserId);
+      }
+
+      return {
+        userId: otherUserId,
+        userName: user ? user.name : 'Unknown User',
+        userEmail: user ? user.email : '',
+        userRole: user ? (user.role || model) : '', // Fallback role
+        lastMessage: conv.lastMessage,
+        unreadCount: conv.unreadCount
+      };
+    }));
+
+    res.json({ success: true, data: populatedConversations });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching conversations', error: error.message });
   }
@@ -435,7 +490,7 @@ export const getConversationsList = async (req, res) => {
 export const getAnnouncements = async (req, res) => {
   try {
     const userRole = req.user.role; // 'Student', 'Staff', or 'HOD'
-    
+
     // Find announcements visible to this user's role
     const announcements = await Announcement.find({
       isActive: true,

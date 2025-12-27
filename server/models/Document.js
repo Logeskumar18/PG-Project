@@ -10,7 +10,7 @@ const documentSchema = new mongoose.Schema(
     // For solo projects, use studentId. For team projects, use studentId of submitter (optional)
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Student',
       required: false
     },
     type: {
@@ -39,7 +39,7 @@ const documentSchema = new mongoose.Schema(
     },
     reviewedBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+      ref: 'Staff'
     },
     reviewedAt: {
       type: Date

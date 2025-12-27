@@ -14,7 +14,7 @@ const TeamDashboard = () => {
   const [team] = useState({
     id: 1,
     name: 'Team Alpha',
-    project: { title: 'AI Chatbot System', status: 'In Progress' },
+    project: { title: 'AI Chatbot System', status: 'In Progress', submissionDate: '2024-11-10' },
     guide: { name: 'Dr. Smith', email: 'smith@example.com' },
     members: [
       { id: 1, name: 'Raj Patel', rollNumber: '21001', role: 'Leader', email: 'raj@example.com' },

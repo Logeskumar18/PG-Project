@@ -2,7 +2,7 @@ import Team from '../models/Team.js';
 import Project from '../models/Project.js';
 import Progress from '../models/Progress.js';
 import Document from '../models/Document.js';
-import User from '../models/User.js';
+
 
 // Create a new team
 export const createTeam = async (req, res) => {
@@ -30,8 +30,8 @@ export const createTeam = async (req, res) => {
     await team.save();
 
     // Update project with team reference if needed
-    await Project.findByIdAndUpdate(projectId, { 
-      assignedGuideId: guideId 
+    await Project.findByIdAndUpdate(projectId, {
+      assignedGuideId: guideId
     });
 
     const populatedTeam = await Team.findById(team._id)
@@ -260,7 +260,7 @@ export const submitTeamProgress = async (req, res) => {
     // Update team overall progress (average of all progress entries)
     const allProgress = await Progress.find({ teamId });
     const avgProgress = allProgress.reduce((sum, p) => sum + p.progressPercentage, 0) / allProgress.length;
-    
+
     await Team.findByIdAndUpdate(teamId, {
       overallProgress: Math.round(avgProgress)
     });
@@ -319,8 +319,8 @@ export const getTeamProgressDashboard = async (req, res) => {
       .sort({ uploadedAt: -1 });
 
     // Get milestones
-    const milestones = await mongoose.model('Milestone').find({ 
-      projectId: team.projectId 
+    const milestones = await mongoose.model('Milestone').find({
+      projectId: team.projectId
     }).sort({ dueDate: 1 });
 
     // Team statistics

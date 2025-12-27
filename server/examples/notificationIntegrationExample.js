@@ -4,7 +4,7 @@
 import Project from '../models/Project.js';
 import Document from '../models/Document.js';
 import Milestone from '../models/Milestone.js';
-import User from '../models/User.js';
+
 import {
   notifyProjectApproval,
   notifyProjectRejection,

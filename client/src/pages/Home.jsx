@@ -8,7 +8,7 @@ const Home = () => {
       <Navbar bg="white" expand="lg" className="shadow-sm py-3 sticky-top">
         <Container>
           <Navbar.Brand className="fw-bold fs-3" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'}}>
-            Lo2 Project
+             Project Tracking
           </Navbar.Brand>
           <Navbar.Toggle aria-controls="basic-navbar-nav" />
           <Navbar.Collapse id="basic-navbar-nav">
@@ -283,81 +283,7 @@ const Home = () => {
       </div>
 
       {/* Demo Credentials Section */}
-      <div className="py-5 bg-white">
-        <Container>
-          <div className="text-center mb-5">
-            <h2 className="display-5 fw-bold mb-3">Try Demo Accounts</h2>
-            <p className="text-muted fs-5">Use these example credentials to explore the platform</p>
-          </div>
-          <Row className="g-4">
-            <Col md={4}>
-              <Card className="h-100 border-0 shadow-sm">
-                <Card.Body className="p-4">
-                  <div className="d-flex align-items-center mb-3">
-                    <div className="rounded-circle d-flex align-items-center justify-content-center me-3" style={{width: '50px', height: '50px', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', color: 'white'}}>
-                      👤
-                    </div>
-                    <h5 className="fw-bold mb-0">HOD Demo</h5>
-                  </div>
-                  <div className="bg-light rounded-3 p-3 mb-3">
-                    <p className="mb-2 small text-muted">Email:</p>
-                    <code className="d-block mb-3">hod.cs@example.com</code>
-                    <p className="mb-2 small text-muted">Password:</p>
-                    <code className="d-block">demo123</code>
-                  </div>
-                  <Link to="/login/hod" className="btn btn-sm w-100 text-white fw-semibold" style={{background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', border: 'none'}}>
-                    Login as HOD
-                  </Link>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            <Col md={4}>
-              <Card className="h-100 border-0 shadow-sm">
-                <Card.Body className="p-4">
-                  <div className="d-flex align-items-center mb-3">
-                    <div className="rounded-circle d-flex align-items-center justify-content-center me-3" style={{width: '50px', height: '50px', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', color: 'white'}}>
-                      👨‍🏫
-                    </div>
-                    <h5 className="fw-bold mb-0">Staff Demo</h5>
-                  </div>
-                  <div className="bg-light rounded-3 p-3 mb-3">
-                    <p className="mb-2 small text-muted">Email:</p>
-                    <code className="d-block mb-3">arun.singh@example.com</code>
-                    <p className="mb-2 small text-muted">Password:</p>
-                    <code className="d-block">demo123</code>
-                  </div>
-                  <Link to="/login/staff" className="btn btn-sm w-100 text-white fw-semibold" style={{background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', border: 'none'}}>
-                    Login as Staff
-                  </Link>
-                </Card.Body>
-              </Card>
-            </Col>
-
-            <Col md={4}>
-              <Card className="h-100 border-0 shadow-sm">
-                <Card.Body className="p-4">
-                  <div className="d-flex align-items-center mb-3">
-                    <div className="rounded-circle d-flex align-items-center justify-content-center me-3" style={{width: '50px', height: '50px', background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', color: 'white'}}>
-                      🎓
-                    </div>
-                    <h5 className="fw-bold mb-0">Student Demo</h5>
-                  </div>
-                  <div className="bg-light rounded-3 p-3 mb-3">
-                    <p className="mb-2 small text-muted">Email:</p>
-                    <code className="d-block mb-3">raj.patel@example.com</code>
-                    <p className="mb-2 small text-muted">Password:</p>
-                    <code className="d-block">demo123</code>
-                  </div>
-                  <Link to="/login/student" className="btn btn-sm w-100 text-white fw-semibold" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none'}}>
-                    Login as Student
-                  </Link>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        </Container>
-      </div>
+    
 
       {/* About Section */}
       <Container className="py-5" id="about">

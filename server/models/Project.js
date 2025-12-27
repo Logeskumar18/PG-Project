@@ -2,51 +2,67 @@ import mongoose from 'mongoose';
 
 const projectSchema = new mongoose.Schema(
   {
-    // For solo projects, use studentId. For team projects, use teamId and students array.
+    // Solo project
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Student',
       required: false
     },
+
+    // Team project
     teamId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'Team',
-      required: false
+      ref: 'Team'
     },
-    students: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
-    }],
+
+    students: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Student'
+      }
+    ],
+
+    // Assigned guide
     assignedGuideId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+      ref: 'Staff',
+      required: false
     },
+
     title: {
       type: String,
       required: true,
       trim: true
     },
+
     description: {
       type: String,
       trim: true
     },
+
+    // Project workflow
     status: {
       type: String,
-      enum: ['Draft', 'Submitted', 'Approved', 'Rejected', 'In Progress', 'Completed'],
+      enum: ['Draft', 'Submitted', 'In Progress', 'Completed'],
       default: 'Submitted'
     },
+
+    // Approval workflow
     approvalStatus: {
       type: String,
       enum: ['Pending', 'Approved', 'Rejected'],
       default: 'Pending'
     },
-    approvalRemarks: {
-      type: String
-    },
-    approvedAt: {
-      type: Date
-    },
+
+    approvalRemarks: String,
+    approvedAt: Date,
+
     submittedAt: {
+      type: Date,
+      default: Date.now
+    },
+
+    submissionDate: {
       type: Date,
       default: Date.now
     }

@@ -27,15 +27,15 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       setLoading(true);
       const response = await authAPI.register(userData);
-      
+
       const { user: newUser, token: newToken } = response.data.data;
-      
+
       // Save to state and localStorage
       setUser(newUser);
       setToken(newToken);
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(newUser));
-      
+
       setLoading(false);
       return { success: true, user: newUser };
     } catch (err) {
@@ -51,26 +51,26 @@ export const AuthProvider = ({ children }) => {
     try {
       setError(null);
       setLoading(true);
-      
+
       // Determine role based on login URL or credentials
       const role = credentials.role || 'Student';
       const loginPayload = { ...credentials, role };
-      
+
       const response = await authAPI.login(loginPayload);
-      
+
       // Response structure: { data: { status, message, data: { user, token } } }
       const { user: loggedUser, token: newToken } = response.data.data;
-      
+
       if (!loggedUser || !newToken) {
         throw new Error('Invalid response from server');
       }
-      
+
       // Save to state and localStorage
       setUser(loggedUser);
       setToken(newToken);
       localStorage.setItem('token', newToken);
       localStorage.setItem('user', JSON.stringify(loggedUser));
-      
+
       setLoading(false);
       return { success: true, user: loggedUser };
     } catch (err) {
@@ -97,13 +97,13 @@ export const AuthProvider = ({ children }) => {
       setError(null);
       setLoading(true);
       const response = await authAPI.updateProfile(userData);
-      
+
       const updatedUser = response.data.data.user;
-      
+
       // Update state and localStorage
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
-      
+
       setLoading(false);
       return { success: true, user: updatedUser };
     } catch (err) {

@@ -16,7 +16,7 @@ const progressSchema = new mongoose.Schema(
     // For solo projects, use studentId. For team projects, use studentId of submitter (optional)
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      ref: 'Student',
       required: false
     },
     weekNumber: {

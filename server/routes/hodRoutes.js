@@ -1,6 +1,8 @@
+
 import express from 'express';
 import * as hodController from '../controllers/hodController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { reassignStudentToStaff } from '../controllers/hodController.js';
 
 const router = express.Router();
 
@@ -14,6 +16,9 @@ const isHOD = (req, res, next) => {
   }
   next();
 };
+
+// HOD: Reassign student to another staff
+router.put('/students/:studentId/reassign', protect, isHOD, reassignStudentToStaff);
 
 // Dashboard overview
 router.get('/dashboard/overview', protect, isHOD, hodController.getDashboardOverview);
@@ -29,6 +34,7 @@ router.post('/projects/:projectId/assign-guide', protect, isHOD, hodController.a
 
 // Staff and Students
 router.get('/staff', protect, isHOD, hodController.getAllStaff);
+router.post('/staff', protect, isHOD, hodController.createStaff);
 router.get('/students', protect, isHOD, hodController.getAllStudents);
 
 // Announcements

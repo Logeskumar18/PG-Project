@@ -44,6 +44,11 @@ const studentSchema = new mongoose.Schema(
       type: Boolean,
       default: true
     },
+    createdByStaffId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Staff',
+      required: false // Set to true if all students must be created by staff
+    },
     createdAt: {
       type: Date,
       default: Date.now

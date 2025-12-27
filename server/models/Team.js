@@ -15,7 +15,7 @@ const teamSchema = new mongoose.Schema(
     members: [{
       studentId: {
         type: mongoose.Schema.Types.ObjectId,
-        ref: 'User',
+        ref: 'Student',
         required: true
       },
       role: {
@@ -30,7 +30,7 @@ const teamSchema = new mongoose.Schema(
     }],
     guideId: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User'
+      ref: 'Staff'
     },
     teamSize: {
       type: Number,
@@ -59,7 +59,7 @@ const teamSchema = new mongoose.Schema(
 );
 
 // Update team size when members change
-teamSchema.pre('save', function(next) {
+teamSchema.pre('save', function (next) {
   this.teamSize = this.members.length;
   next();
 });

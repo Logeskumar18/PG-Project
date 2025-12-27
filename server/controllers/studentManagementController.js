@@ -5,49 +5,51 @@ import { notifyTeamCreation } from '../utils/notificationService.js';
 
 const isStudentAssignedToStaff = async (studentId, staffId) => {
   const project = await Project.findOne({ studentId, assignedGuideId: staffId }).lean();
-  return Boolean(project);
+  if (project) return true;
+  // Also check if student was created by this staff
+  const student = await Student.findById(studentId).select('createdByStaffId');
+  return student?.createdByStaffId?.toString() === staffId.toString();
 };
-
-// Create a new student
 export const createStudent = async (req, res) => {
   try {
     const { name, email, password, studentId, department } = req.body;
 
-    // Check if student already exists
-    const studentExists = await Student.findOne({ $or: [{ email }, { studentId }] });
+    const studentExists = await Student.findOne({
+      $or: [{ email }, { studentId }]
+    });
+
     if (studentExists) {
-      return res.status(400).json({ 
-        message: 'Student with this email or student ID already exists' 
+      return res.status(400).json({
+        message: 'Student with this email or student ID already exists'
       });
     }
 
-    // Allow staff to create standalone students, assign department if not specified
+    // ✅ ALWAYS set staff ID
     const student = await Student.create({
       name,
       email,
       password,
       studentId,
-      department: department || req.user.department // Use staff's department if not specified
+      department: department || req.user.department,
+      createdByStaffId: req.user._id
     });
-
-    // Remove password from response
-    const studentData = {
-      _id: student._id,
-      name: student.name,
-      email: student.email,
-      studentId: student.studentId,
-      department: student.department
-    };
 
     res.status(201).json({
       success: true,
       message: 'Student created successfully',
-      data: studentData
+      data: {
+        _id: student._id,
+        name: student.name,
+        email: student.email,
+        studentId: student.studentId,
+        department: student.department
+      }
     });
+
   } catch (error) {
-    res.status(500).json({ 
-      message: 'Error creating student', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Error creating student',
+      error: error.message
     });
   }
 };
@@ -199,7 +201,7 @@ export const updateStudent = async (req, res) => {
     const updates = req.body;
 
     if (req.user.role === 'Staff') {
-      const allowed = await isStudentAssignedToStaff(studentId, req.user.id);
+      const allowed = await isStudentAssignedToStaff(studentId, req.user._id);
       if (!allowed) {
         return res.status(403).json({ message: 'You can only update students assigned to you.' });
       }
@@ -237,7 +239,7 @@ export const deleteStudent = async (req, res) => {
     const { studentId } = req.params;
 
     if (req.user.role === 'Staff') {
-      const allowed = await isStudentAssignedToStaff(studentId, req.user.id);
+      const allowed = await isStudentAssignedToStaff(studentId, req.user._id);
       if (!allowed) {
         return res.status(403).json({ message: 'You can only delete students assigned to you.' });
       }

@@ -15,7 +15,7 @@ const StaffRegister = () => {
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
+
   const { register } = useAuth();
   const navigate = useNavigate();
 
@@ -68,7 +68,7 @@ const StaffRegister = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (!validateForm()) {
       return;
     }
@@ -96,7 +96,7 @@ const StaffRegister = () => {
   };
 
   return (
-    <div className="min-vh-100 d-flex align-items-center py-4" style={{background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)'}}>
+    <div className="min-vh-100 d-flex align-items-center py-4" style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
       <Container>
         <Row className="justify-content-center">
           <Col md={8} lg={6}>
@@ -218,12 +218,12 @@ const StaffRegister = () => {
                     </Form.Control.Feedback>
                   </Form.Group>
 
-                  <Button 
-                    type="submit" 
+                  <Button
+                    type="submit"
                     variant="primary"
                     className="w-100 py-2 fw-semibold"
                     disabled={isSubmitting}
-                    style={{background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', border: 'none'}}
+                    style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', border: 'none' }}
                   >
                     {isSubmitting ? 'Creating Account...' : 'Create Staff Account'}
                   </Button>

@@ -3,13 +3,23 @@ import mongoose from 'mongoose';
 const messageSchema = new mongoose.Schema({
   senderId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    refPath: 'senderModel',
     required: true
+  },
+  senderModel: {
+    type: String,
+    required: true,
+    enum: ['Student', 'Staff', 'HOD']
   },
   receiverId: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+    refPath: 'receiverModel',
     required: true
+  },
+  receiverModel: {
+    type: String,
+    required: true,
+    enum: ['Student', 'Staff', 'HOD']
   },
   subject: {
     type: String,

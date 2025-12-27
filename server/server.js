@@ -8,6 +8,7 @@ import hodRoutes from './routes/hodRoutes.js';
 import teamRoutes from './routes/teamRoutes.js';
 import communicationRoutes from './routes/communicationRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
+import marksRoutes from './routes/marks.js';
 
 // Load environment variables
 dotenv.config();
@@ -26,6 +27,9 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Serve static files from uploads directory
+app.use('/uploads', express.static('uploads'));
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/staff', staffRoutes);
@@ -33,11 +37,12 @@ app.use('/api/hod', hodRoutes);
 app.use('/api/teams', teamRoutes);
 app.use('/api/communication', communicationRoutes);
 app.use('/api/student', studentRoutes);
+app.use('/api/marks', marksRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'success', 
+  res.status(200).json({
+    status: 'success',
     message: 'Server is running',
     timestamp: new Date().toISOString()
   });
@@ -61,7 +66,7 @@ app.use((req, res) => {
 });
 
 // Start server
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
 });

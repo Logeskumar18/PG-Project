@@ -18,8 +18,13 @@ const announcementSchema = new mongoose.Schema(
     },
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',
+      refPath: 'createdByUserModel',
       required: true
+    },
+    createdByUserModel: {
+      type: String,
+      required: true,
+      enum: ['HOD', 'Staff']
     },
     targetAudience: {
       type: String,

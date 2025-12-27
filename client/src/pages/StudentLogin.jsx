@@ -144,9 +144,9 @@ const StudentLogin = () => {
                 </Form>
 
                 <div className="text-center mt-4 pt-3 border-top">
-                  <p className="text-muted mb-2">
+                  {/* <p className="text-muted mb-2">
                     Don't have an account? <Link to="/register/student" className="text-decoration-none fw-semibold">Register as Student</Link>
-                  </p>
+                  </p> */}
                   <Link to="/" className="text-muted text-decoration-none">← Back to Home</Link>
                 </div>
               </Card.Body>
