@@ -675,20 +675,6 @@ const StaffDashboard = () => {
                                   </Button>
                                 </>
                               )}
-                              {status !== 'Approved' && (
-                                <Button
-                                  variant="warning"
-                                  size="sm"
-                                  onClick={() => {
-                                    setSelectedProject(project);
-                                    setEditTitle(project.title);
-                                    setEditDescription(project.description || '');
-                                    setShowEditModal(true);
-                                  }}
-                                >
-                                  ✏️ Edit
-                                </Button>
-                              )}
                               {/* Approval Modal */}
                               <Modal show={showApprovalModal} onHide={() => setShowApprovalModal(false)} centered>
                                 ...

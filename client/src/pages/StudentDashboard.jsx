@@ -507,9 +507,11 @@ const StudentDashboard = () => {
                         <p className="text-muted mb-0">{projects[0].approvalRemarks}</p>
                       </div>
                     )}
-                    <Button variant="outline-primary" onClick={() => setShowProjectModal(true)}>
-                      Submit Another Project
-                    </Button>
+                    {projects[0].approvalStatus !== 'Approved' && (
+                      <Button variant="outline-primary" onClick={() => setShowProjectModal(true)}>
+                        Submit Another Project
+                      </Button>
+                    )}
                   </Card.Body>
                 </Card>
               )}
