@@ -459,13 +459,7 @@ const StaffDashboard = () => {
           >
             ➕ Create Student
           </Button>
-          <Button
-            variant={activeTab === 'create-team' ? 'primary' : 'light'}
-            onClick={() => setActiveTab('create-team')}
-            className="fw-semibold"
-          >
-            👥 Create Team
-          </Button>
+          
           <Button
             variant={activeTab === 'messages' ? 'primary' : 'light'}
             onClick={() => setActiveTab('messages')}

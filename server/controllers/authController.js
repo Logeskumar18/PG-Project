@@ -282,6 +282,20 @@ export const updateProfile = async (req, res) => {
 
     // Update password if provided
     if (req.body.password) {
+      // Require currentPassword and check
+      if (!req.body.currentPassword) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Current password is required to change password.'
+        });
+      }
+      const isMatch = await user.comparePassword(req.body.currentPassword);
+      if (!isMatch) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Current password is incorrect.'
+        });
+      }
       user.password = req.body.password;
     }
 

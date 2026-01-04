@@ -1,5 +1,6 @@
 
 import { useState, useEffect } from 'react';
+import MyProfile from './MyProfile';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge } from 'react-bootstrap';
@@ -379,7 +380,22 @@ const StudentDashboard = () => {
           >
             📢 Announcements
           </Button>
+          <Button
+            variant={activeTab === 'profile' ? 'primary' : 'light'}
+            onClick={() => setActiveTab('profile')}
+            className="fw-semibold"
+          >
+            👤 My Profile
+          </Button>
         </div>
+        {/* My Profile Tab */}
+        {activeTab === 'profile' && (
+          <Row className="g-4">
+            <Col lg={12}>
+              <MyProfile />
+            </Col>
+          </Row>
+        )}
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
