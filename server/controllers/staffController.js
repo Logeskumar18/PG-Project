@@ -5,6 +5,7 @@ import Progress from '../models/Progress.js';
 import Staff from '../models/Staff.js';
 import Team from '../models/Team.js';
 import { notifyProjectApproval, notifyProjectRejection, notifyDocumentReview, createNotification } from '../utils/notificationService.js';
+import { sendMail } from '../utils/mailer.js';
 
 // Get assigned students (ownership-based)
 import Student from '../models/Student.js';
@@ -126,6 +127,103 @@ export const approveProject = async (req, res) => {
     // Notify student
     await notifyProjectApproval(project, req.user);
 
+    // Send Email to Student
+    if (project.studentId && project.studentId.email) {
+      await sendMail({
+        to: project.studentId.email,
+        subject: `✅ Project Approved: ${project.title}`,
+
+        text: `Dear ${project.studentId.name},
+
+Your project "${project.title}" has been approved by your guide ${req.user.name}.
+
+Remarks:
+${remarks || 'None'}
+
+You may now proceed with the next phase of your project.
+
+Regards,
+Project Portal`,
+
+        html: `
+    <div style="background-color:#f4f6f8; padding:30px; font-family:Arial, Helvetica, sans-serif;">
+      <div style="max-width:600px; margin:auto; background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+        
+        <!-- Header -->
+        <div style="background:#10b981; padding:20px; text-align:center; color:#ffffff;">
+          <h2 style="margin:0; font-size:22px;">Project Approved</h2>
+          <p style="margin:6px 0 0; font-size:14px;">
+            Congratulations 🎉
+          </p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:25px;">
+          <p style="font-size:15px; color:#333;">
+            Dear <strong>${project.studentId.name}</strong>,
+          </p>
+
+          <p style="font-size:14px; color:#555; line-height:1.6;">
+            Your project has been reviewed and 
+            <strong style="color:#10b981;">approved</strong>
+            by your guide <strong>${req.user.name}</strong>.
+          </p>
+
+          <!-- Project Info -->
+          <div style="margin:20px 0; border:1px solid #d1fae5; border-radius:6px; overflow:hidden;">
+            <div style="background:#ecfdf5; padding:12px 15px; font-weight:bold; color:#065f46;">
+              Approval Details
+            </div>
+
+            <table style="width:100%; border-collapse:collapse; font-size:14px;">
+              <tr>
+                <td style="padding:10px 15px; border-top:1px solid #d1fae5;"><strong>Project Title</strong></td>
+                <td style="padding:10px 15px; border-top:1px solid #d1fae5;">
+                  ${project.title}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:10px 15px; border-top:1px solid #d1fae5;"><strong>Guide</strong></td>
+                <td style="padding:10px 15px; border-top:1px solid #d1fae5;">
+                  ${req.user.name}
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Remarks -->
+          <div style="background:#f0fdf4; border-left:4px solid #22c55e; padding:15px; border-radius:4px;">
+            <p style="margin:0 0 6px; font-size:14px; font-weight:bold; color:#065f46;">
+              Remarks
+            </p>
+            <p style="margin:0; font-size:14px; color:#065f46; line-height:1.6;">
+              ${remarks || 'No remarks provided.'}
+            </p>
+          </div>
+
+          <p style="font-size:14px; color:#555; margin-top:20px;">
+            You may now proceed with the next phase of your project. 
+            If you have any questions, feel free to contact your guide.
+          </p>
+
+          <p style="margin-top:30px; font-size:14px; color:#333;">
+            Regards,<br>
+            <strong>Project Portal Team</strong>
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background:#f9fafb; padding:14px; text-align:center; font-size:12px; color:#6b7280;">
+          © ${new Date().getFullYear()} Project Portal. All rights reserved.
+        </div>
+
+      </div>
+    </div>
+  `
+      });
+
+    }
+
     res.json({
       status: 'success',
       message: 'Project approved successfully',
@@ -166,6 +264,102 @@ export const rejectProject = async (req, res) => {
 
     // Notify student
     await notifyProjectRejection(project, req.user);
+
+    // Send Email to Student
+    if (project.studentId && project.studentId.email) {
+      await sendMail({
+        to: project.studentId.email,
+        subject: `❌ Project Rejected: ${project.title}`,
+
+        text: `Dear ${project.studentId.name},
+
+Your project "${project.title}" has been rejected by your guide ${req.user.name}.
+
+Remarks:
+${remarks}
+
+Please review the remarks and resubmit your project.
+
+Regards,
+Project Portal`,
+
+        html: `
+    <div style="background-color:#f4f6f8; padding:30px; font-family:Arial, Helvetica, sans-serif;">
+      <div style="max-width:600px; margin:auto; background:#ffffff; border-radius:8px; overflow:hidden; box-shadow:0 4px 12px rgba(0,0,0,0.1);">
+        
+        <!-- Header -->
+        <div style="background:#ef4444; padding:20px; text-align:center; color:#ffffff;">
+          <h2 style="margin:0; font-size:22px;">Project Rejected</h2>
+          <p style="margin:6px 0 0; font-size:14px;">
+            Action Required
+          </p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding:25px;">
+          <p style="font-size:15px; color:#333;">
+            Dear <strong>${project.studentId.name}</strong>,
+          </p>
+
+          <p style="font-size:14px; color:#555; line-height:1.6;">
+            Your project has been reviewed and <strong style="color:#ef4444;">rejected</strong>
+            by your guide <strong>${req.user.name}</strong>.
+          </p>
+
+          <!-- Project Info -->
+          <div style="margin:20px 0; border:1px solid #fee2e2; border-radius:6px; overflow:hidden;">
+            <div style="background:#fef2f2; padding:12px 15px; font-weight:bold; color:#991b1b;">
+              Review Details
+            </div>
+
+            <table style="width:100%; border-collapse:collapse; font-size:14px;">
+              <tr>
+                <td style="padding:10px 15px; border-top:1px solid #fee2e2;"><strong>Project Title</strong></td>
+                <td style="padding:10px 15px; border-top:1px solid #fee2e2;">
+                  ${project.title}
+                </td>
+              </tr>
+              <tr>
+                <td style="padding:10px 15px; border-top:1px solid #fee2e2;"><strong>Guide</strong></td>
+                <td style="padding:10px 15px; border-top:1px solid #fee2e2;">
+                  ${req.user.name}
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <!-- Remarks -->
+          <div style="background:#fff7ed; border-left:4px solid #f97316; padding:15px; border-radius:4px;">
+            <p style="margin:0 0 6px; font-size:14px; font-weight:bold; color:#7c2d12;">
+              Remarks
+            </p>
+            <p style="margin:0; font-size:14px; color:#7c2d12; line-height:1.6;">
+              ${remarks}
+            </p>
+          </div>
+
+          <p style="font-size:14px; color:#555; margin-top:20px;">
+            Please correct the issues mentioned above and resubmit your project
+            through the Project Portal.
+          </p>
+
+          <p style="margin-top:30px; font-size:14px; color:#333;">
+            Regards,<br>
+            <strong>Project Portal Team</strong>
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background:#f9fafb; padding:14px; text-align:center; font-size:12px; color:#6b7280;">
+          © ${new Date().getFullYear()} Project Portal. All rights reserved.
+        </div>
+
+      </div>
+    </div>
+  `
+      });
+
+    }
 
     res.json({
       status: 'success',

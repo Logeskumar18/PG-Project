@@ -1,3 +1,5 @@
+import Staff from '../models/Staff.js';
+import { sendMail } from '../utils/mailer.js';
 // Student updates their own project
 export const updateMyProject = async (req, res) => {
   try {
@@ -11,12 +13,44 @@ export const updateMyProject = async (req, res) => {
 
     const project = await Project.findOneAndUpdate(
       { studentId: student._id },
-      { title, description },
+      { 
+        title, 
+        description,
+        approvalStatus: 'Pending', // Reset approval status on update (Resubmission)
+        status: 'Submitted'
+      },
       { new: true }
     );
     if (!project) {
       return res.status(404).json({ message: 'No project found to update' });
     }
+
+    // Notify Guide via Email about Resubmission
+    if (project.assignedGuideId) {
+      const guide = await Staff.findById(project.assignedGuideId);
+      if (guide) {
+        await sendMail({
+          to: guide.email,
+          subject: `⏳ Project approval pending for Student ID: ${student.studentId}`,
+          text: `Dear ${guide.name},\n\nThe student ${student.name} (${student.studentId}) has updated/resubmitted their project "${title}". It is now pending your approval.\n\nRegards,\nProject Portal`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+              <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto;">
+                <h2 style="color: #4f46e5;">Project Resubmission</h2>
+                <p>Dear <strong>${guide.name}</strong>,</p>
+                <p>The student <strong>${student.name}</strong> (ID: ${student.studentId}) has updated their project details.</p>
+                <div style="background-color: #f9fafb; padding: 15px; border-left: 4px solid #4f46e5; margin: 20px 0;">
+                  <p style="margin: 0;"><strong>Project:</strong> ${title}</p>
+                  <p style="margin: 5px 0 0;"><strong>Status:</strong> Pending Approval</p>
+                </div>
+                <p>Please login to the portal to review and approve/reject this submission.</p>
+              </div>
+            </div>
+          `
+        });
+      }
+    }
+
     res.json({ success: true, message: 'Project updated', data: project });
   } catch (error) {
     res.status(500).json({ message: 'Error updating project', error: error.message });
@@ -110,6 +144,30 @@ export const createProject = async (req, res) => {
         priority: 'High',
         actionUrl: `/dashboard/staff?tab=approvals`
       });
+
+      // Send Email to Guide
+      const guide = await Staff.findById(assignedGuideId);
+      if (guide) {
+        await sendMail({
+          to: guide.email,
+          subject: `⏳ Project approval pending for Student ID: ${student.studentId}`,
+          text: `Dear ${guide.name},\n\nA new project titled "${title}" has been submitted by student ${student.name} (ID: ${student.studentId}) and is pending your approval.\n\nRegards,\nProject Portal`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+              <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto;">
+                <h2 style="color: #4f46e5;">New Project Submission</h2>
+                <p>Dear <strong>${guide.name}</strong>,</p>
+                <p>A new project has been submitted for your approval.</p>
+                <div style="background-color: #f9fafb; padding: 15px; border-left: 4px solid #4f46e5; margin: 20px 0;">
+                  <p style="margin: 0;"><strong>Student:</strong> ${student.name} (${student.studentId})</p>
+                  <p style="margin: 5px 0 0;"><strong>Project:</strong> ${title}</p>
+                </div>
+                <p>Please login to the portal to review this submission.</p>
+              </div>
+            </div>
+          `
+        });
+      }
     }
 
     res.status(201).json({
