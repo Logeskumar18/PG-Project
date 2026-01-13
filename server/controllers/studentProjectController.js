@@ -238,8 +238,30 @@ export const uploadDocument = async (req, res) => {
         notifyStaffId = student.createdByStaffId;
       }
     }
+
     if (notifyStaffId) {
       await notifyDocumentSubmission(document, req.user.name || 'A student');
+
+      // Send email notification to reviewer
+      const reviewer = await Staff.findById(notifyStaffId);
+      if (reviewer && reviewer.email) {
+        await sendMail({
+          to: reviewer.email,
+          subject: '📄 New project report uploaded for review',
+          text: `A new document has been uploaded for your review.\n\nStudent: ${student.name}\nDocument: ${document.type}\nFile: ${document.fileName}\n\nPlease log in to the portal to review the document.`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+              <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto;">
+                <h2 style="color: #4f46e5;">📄 New Document Uploaded for Review</h2>
+                <p><strong>Student:</strong> ${student.name}</p>
+                <p><strong>Document Type:</strong> ${document.type}</p>
+                <p><strong>File Name:</strong> ${document.fileName}</p>
+                <p>Please log in to the portal to review this document.</p>
+              </div>
+            </div>
+          `
+        });
+      }
     }
 
     res.status(201).json({
