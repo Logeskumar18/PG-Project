@@ -32,6 +32,7 @@ import Milestone from '../models/Milestone.js';
 import Student from '../models/Student.js';
 import Staff from '../models/Staff.js';
 import Announcement from '../models/Announcement.js';
+import { notifyAnnouncement } from '../utils/notificationService.js';
 
 
 // Get dashboard overview for HOD
@@ -411,6 +412,19 @@ export const createAnnouncement = async (req, res) => {
 
     await announcement.save();
 
+    // Fetch recipients based on target audience
+    let recipients = [];
+    if (targetAudience === 'Students' || targetAudience === 'All') {
+      const students = await Student.find({ isActive: true }).select('name email');
+      recipients = [...recipients, ...students];
+    }
+    if (targetAudience === 'Staff' || targetAudience === 'All') {
+      const staff = await Staff.find({ isActive: true }).select('name email');
+      recipients = [...recipients, ...staff];
+    }
+
+    await notifyAnnouncement(announcement, recipients);
+
     res.status(201).json({
       status: 'success',
       message: 'Announcement created successfully',
@@ -454,6 +468,19 @@ export const updateAnnouncement = async (req, res) => {
       updates,
       { new: true }
     ).populate('createdBy', 'name email');
+
+    // Fetch recipients for update notification
+    let recipients = [];
+    if (announcement.targetAudience === 'Students' || announcement.targetAudience === 'All') {
+      const students = await Student.find({ isActive: true }).select('name email');
+      recipients = [...recipients, ...students];
+    }
+    if (announcement.targetAudience === 'Staff' || announcement.targetAudience === 'All') {
+      const staff = await Staff.find({ isActive: true }).select('name email');
+      recipients = [...recipients, ...staff];
+    }
+
+    await notifyAnnouncement(announcement, recipients, true);
 
     res.json({
       status: 'success',

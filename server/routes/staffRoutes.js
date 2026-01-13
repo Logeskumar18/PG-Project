@@ -188,5 +188,11 @@ router.get(
   staffController.getStudentProgress
 );
 
+router.post(
+  '/progress/:progressId/review',
+  protect,
+  isStaff,
+  staffController.reviewProgress
+);
 
 export default router;

@@ -2,6 +2,7 @@ import Team from '../models/Team.js';
 import Project from '../models/Project.js';
 import Progress from '../models/Progress.js';
 import Document from '../models/Document.js';
+import { notifyProgressSubmission } from '../utils/notificationService.js';
 
 
 // Create a new team
@@ -264,6 +265,10 @@ export const submitTeamProgress = async (req, res) => {
     await Team.findByIdAndUpdate(teamId, {
       overallProgress: Math.round(avgProgress)
     });
+
+    // Notify Guide
+    const team = await Team.findById(teamId).populate('guideId');
+    await notifyProgressSubmission(progress, team, 'Team');
 
     res.status(201).json({
       status: 'success',

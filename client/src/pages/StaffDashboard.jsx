@@ -813,21 +813,25 @@ const StaffDashboard = () => {
                             >
                               Download
                             </Button>
-                             <Button
-                              variant="outline-success"
-                              size="sm"
-                              className="me-2"
-                              onClick={() => handleApproveDocument(doc)}
-                            >
-                              Approve
-                            </Button>
-                            <Button
-                              variant="outline-danger"
-                              size="sm"
-                              onClick={() => handleRejectDocument(doc)}
-                            >
-                              Reject
-                            </Button> 
+                            {(doc.reviewStatus === 'Pending' || doc.status === 'Pending' || !doc.reviewStatus && !doc.status) && (
+                              <>
+                                <Button
+                                  variant="outline-success"
+                                  size="sm"
+                                  className="me-2"
+                                  onClick={() => handleApproveDocument(doc)}
+                                >
+                                  Approve
+                                </Button>
+                                <Button
+                                  variant="outline-danger"
+                                  size="sm"
+                                  onClick={() => handleRejectDocument(doc)}
+                                >
+                                  Reject
+                                </Button>
+                              </>
+                            )}
                           </td>
                         </tr>
                       ))}

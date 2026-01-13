@@ -64,7 +64,7 @@ import Milestone from '../models/Milestone.js';
 import Progress from '../models/Progress.js';
 import multer from 'multer';
 import path from 'path';
-import { createNotification, notifyDocumentSubmission } from '../utils/notificationService.js';
+import { createNotification, notifyDocumentSubmission, notifyProgressSubmission } from '../utils/notificationService.js';
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -347,17 +347,9 @@ export const submitProgress = async (req, res) => {
     });
 
     // Notify the assigned guide
-    if (project.assignedGuideId) {
-      await createNotification({
-        userId: project.assignedGuideId,
-        type: 'PROGRESS_SUBMITTED',
-        title: 'Progress Update Submitted',
-        message: `Student submitted progress update for project: ${project.title}`,
-        relatedTo: { type: 'Progress', referenceId: progress._id },
-        priority: 'Medium',
-        actionUrl: `/dashboard/staff?tab=progress`
-      });
-    }
+    // Fetch project with guide populated to ensure we have email for notification
+    const projectWithGuide = await Project.findById(projectId).populate('assignedGuideId');
+    await notifyProgressSubmission(progress, projectWithGuide, 'Project');
 
     res.json({ success: true, message: 'Progress submitted successfully', data: progress });
   } catch (error) {

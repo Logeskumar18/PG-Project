@@ -20,6 +20,7 @@ const notificationSchema = new mongoose.Schema({
       'TEAM_CREATED',
       'TEAM_MEMBER_ADDED',
       'PROGRESS_SUBMITTED',
+      'PROGRESS_REVIEWED',
       'MESSAGE_RECEIVED',
       'ANNOUNCEMENT_POSTED',
       'GUIDE_ASSIGNED',

@@ -4,7 +4,7 @@ import Milestone from '../models/Milestone.js';
 import Progress from '../models/Progress.js';
 import Staff from '../models/Staff.js';
 import Team from '../models/Team.js';
-import { notifyProjectApproval, notifyProjectRejection, notifyDocumentReview, createNotification } from '../utils/notificationService.js';
+import { notifyProjectApproval, notifyProjectRejection, notifyDocumentReview, notifyProgressReview, createNotification } from '../utils/notificationService.js';
 import { sendMail } from '../utils/mailer.js';
 
 // Get assigned students (ownership-based)
@@ -449,16 +449,16 @@ export const reviewDocument = async (req, res) => {
     const { reviewStatus, remarks } = req.body;
 
     // Validate review status
-    const validStatuses = ['Approved', 'Rejected', 'Action Needed'];
+    const validStatuses = ['Approved', 'Rejected', 'Action Needed', 'Needs Review'];
     if (reviewStatus && !validStatuses.includes(reviewStatus)) {
       return res.status(400).json({
         status: 'error',
-        message: 'Invalid status. Must be Approved, Rejected, or Action Needed'
+        message: 'Invalid status. Must be Approved, Rejected, Action Needed, or Needs Review'
       });
     }
 
     // Require remarks for negative statuses
-    if ((reviewStatus === 'Rejected' || reviewStatus === 'Action Needed') && !remarks) {
+    if ((reviewStatus === 'Rejected' || reviewStatus === 'Action Needed' || reviewStatus === 'Needs Review') && !remarks) {
       return res.status(400).json({
         status: 'error',
         message: 'Remarks are required when rejecting or requesting action'
@@ -470,6 +470,13 @@ export const reviewDocument = async (req, res) => {
       return res.status(404).json({
         status: 'error',
         message: 'Document not found'
+      });
+    }
+
+    if (!document.projectId) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Project not found for this document'
       });
     }
 
@@ -789,6 +796,38 @@ export const getStudentProgress = async (req, res) => {
       status: 'error',
       message: error.message
     });
+  }
+};
+
+// Review Progress
+export const reviewProgress = async (req, res) => {
+  try {
+    const { progressId } = req.params;
+    const { status, feedback } = req.body;
+
+    if (!['Satisfactory', 'Not Satisfactory'].includes(status)) {
+      return res.status(400).json({ status: 'error', message: 'Invalid status' });
+    }
+
+    const progress = await Progress.findByIdAndUpdate(
+      progressId,
+      {
+        status,
+        feedback,
+        reviewedBy: req.user._id
+      },
+      { new: true }
+    ).populate('studentId', 'name email');
+
+    if (!progress) {
+      return res.status(404).json({ status: 'error', message: 'Progress not found' });
+    }
+
+    await notifyProgressReview(progress, req.user.name);
+
+    res.json({ status: 'success', data: progress });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
   }
 };
 

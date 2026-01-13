@@ -3,6 +3,7 @@ import Staff from '../models/Staff.js';
 import HOD from '../models/HOD.js';
 import { generateToken } from '../middleware/authMiddleware.js';
 import { validationResult } from 'express-validator';
+import { notifyLogin, notifyPasswordChange } from '../utils/notificationService.js';
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -188,6 +189,9 @@ export const login = async (req, res) => {
     // Generate token
     const token = generateToken(user._id);
 
+    // Send Login Notification
+    await notifyLogin(user, req);
+
     res.status(200).json({
       status: 'success',
       message: 'Login successful',
@@ -266,7 +270,8 @@ export const updateProfile = async (req, res) => {
       UserModel = HOD;
     }
 
-    const user = await UserModel.findById(userId);
+    // Select password to allow comparison for password updates
+    const user = await UserModel.findById(userId).select('+password');
 
     if (!user) {
       return res.status(404).json({
@@ -280,7 +285,20 @@ export const updateProfile = async (req, res) => {
     user.phone = req.body.phone || user.phone;
     user.department = req.body.department || user.department;
 
+    // Allow email update with uniqueness check
+    if (req.body.email && req.body.email !== user.email) {
+      const emailExists = await UserModel.findOne({ email: req.body.email });
+      if (emailExists) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Email already in use'
+        });
+      }
+      user.email = req.body.email;
+    }
+
     // Update password if provided
+    let passwordChanged = false;
     if (req.body.password) {
       // Require currentPassword and check
       if (!req.body.currentPassword) {
@@ -296,10 +314,25 @@ export const updateProfile = async (req, res) => {
           message: 'Current password is incorrect.'
         });
       }
+
+      // Check if new password is same as old
+      const isSamePassword = await user.comparePassword(req.body.password);
+      if (isSamePassword) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'New password cannot be the same as the current password.'
+        });
+      }
+
       user.password = req.body.password;
+      passwordChanged = true;
     }
 
     const updatedUser = await user.save();
+
+    if (passwordChanged) {
+      await notifyPasswordChange(updatedUser);
+    }
 
     res.status(200).json({
       status: 'success',
