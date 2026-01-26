@@ -24,7 +24,8 @@ const notificationSchema = new mongoose.Schema({
       'MESSAGE_RECEIVED',
       'ANNOUNCEMENT_POSTED',
       'GUIDE_ASSIGNED',
-      'STATUS_UPDATED'
+      'STATUS_UPDATED',
+      'MARKS_ASSIGNED'
     ],
     required: true
   },
@@ -39,7 +40,7 @@ const notificationSchema = new mongoose.Schema({
   relatedTo: {
     type: {
       type: String,
-      enum: ['Project', 'Document', 'Milestone', 'Team', 'Message', 'Announcement'],
+      enum: ['Project', 'Document', 'Milestone', 'Team', 'Message', 'Announcement', 'Mark'],
     },
     referenceId: {
       type: mongoose.Schema.Types.ObjectId,

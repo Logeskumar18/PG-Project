@@ -195,4 +195,11 @@ router.post(
   staffController.reviewProgress
 );
 
+router.post(
+  '/assign-marks',
+  protect,
+  isStaff,
+  staffController.assignMarks
+);
+
 export default router;

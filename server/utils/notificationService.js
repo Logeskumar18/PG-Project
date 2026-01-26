@@ -814,6 +814,46 @@ export const notifyPasswordChange = async (user) => {
   });
 };
 
+export const notifyMarksAssigned = async (mark, evaluatorName) => {
+  const student = mark.studentId;
+  if (!student || !student.email) return;
+
+  await createNotification({
+    userId: student._id,
+    type: 'MARKS_ASSIGNED',
+    title: '📝 Project Marks Assigned',
+    message: `Your project has been evaluated by ${evaluatorName}. Total Score: ${mark.totalMarks}/40`,
+    relatedTo: { type: 'Mark', referenceId: mark._id },
+    priority: 'High',
+    actionUrl: `/dashboard/student?tab=evaluation`
+  });
+
+  await sendMail({
+    to: student.email,
+    subject: '📝 Project Evaluation Results',
+    text: `Dear ${student.name},\n\nYour project has been evaluated by ${evaluatorName}.\n\nTotal Score: ${mark.totalMarks}/40\n\nBreakdown:\nTitle & Abstract: ${mark.titleMarks}\nProgress: ${mark.progressMarks}\nDocuments: ${mark.documentMarks}\nInteraction: ${mark.interactionMarks}\nFinal Review: ${mark.finalReviewMarks}\n\nRemarks: ${mark.remarks || 'None'}\n\nRegards,\nProject Portal`,
+    html: `
+      <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+        <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto;">
+          <h2 style="color: #4f46e5;">Project Evaluation Results</h2>
+          <p>Dear <strong>${student.name}</strong>,</p>
+          <p>Your project has been evaluated by <strong>${evaluatorName}</strong>.</p>
+          <div style="background-color: #f9fafb; padding: 15px; border-left: 4px solid #4f46e5; margin: 20px 0;">
+            <h3 style="margin: 0 0 10px; color: #4f46e5;">Total Score: ${mark.totalMarks} / 40</h3>
+            <p style="margin: 5px 0;"><strong>Title & Abstract:</strong> ${mark.titleMarks} / 5</p>
+            <p style="margin: 5px 0;"><strong>Weekly Progress:</strong> ${mark.progressMarks} / 10</p>
+            <p style="margin: 5px 0;"><strong>Documents:</strong> ${mark.documentMarks} / 15</p>
+            <p style="margin: 5px 0;"><strong>Interaction:</strong> ${mark.interactionMarks} / 5</p>
+            <p style="margin: 5px 0;"><strong>Final Review:</strong> ${mark.finalReviewMarks} / 5</p>
+            <p style="margin: 15px 0 0;"><strong>Remarks:</strong> ${mark.remarks || 'None'}</p>
+          </div>
+          <p>Please login to the portal to view full details.</p>
+        </div>
+      </div>
+    `
+  });
+};
+
 export default {
   createNotification,
   createBulkNotifications,
@@ -833,5 +873,6 @@ export default {
   notifyAnnouncement,
   sendDeadlineReminders,
   notifyLogin,
-  notifyPasswordChange
+  notifyPasswordChange,
+  notifyMarksAssigned
 };

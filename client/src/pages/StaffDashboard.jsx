@@ -118,9 +118,24 @@ const StaffDashboard = () => {
 
   const handleMarksChange = (e) => {
     const { name, value } = e.target;
+
+    if (name === 'remarks') {
+      setMarksData(prev => ({ ...prev, [name]: value }));
+      return;
+    }
+
+    let val = Number(value);
+    if (val < 0) val = 0;
+
+    if (name === 'titleMarks' && val > 5) val = 5;
+    if (name === 'progressMarks' && val > 10) val = 10;
+    if (name === 'documentMarks' && val > 15) val = 15;
+    if (name === 'interactionMarks' && val > 5) val = 5;
+    if (name === 'finalReviewMarks' && val > 5) val = 5;
+
     setMarksData(prev => ({
       ...prev,
-      [name]: name === 'remarks' ? value : Number(value)
+      [name]: val
     }));
   };
 
@@ -134,7 +149,7 @@ const StaffDashboard = () => {
   const submitMarks = async () => {
     if (!selectedProjectForMarks) return;
     try {
-      await api.post('/marks/assign-marks', {
+      await api.post('/staff/assign-marks', {
         studentId: selectedProjectForMarks.studentId._id || selectedProjectForMarks.studentId,
         projectId: selectedProjectForMarks._id,
         ...marksData
@@ -1337,7 +1352,7 @@ const StaffDashboard = () => {
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Final Review (Max 5)</Form.Label>
+                  <Form.Label>Review (Max 5)</Form.Label>
                   <Form.Control type="number" name="finalReviewMarks" min="0" max="5" value={marksData.finalReviewMarks} onChange={handleMarksChange} />
                 </Form.Group>
               </Col>

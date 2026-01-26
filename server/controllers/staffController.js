@@ -4,7 +4,8 @@ import Milestone from '../models/Milestone.js';
 import Progress from '../models/Progress.js';
 import Staff from '../models/Staff.js';
 import Team from '../models/Team.js';
-import { notifyProjectApproval, notifyProjectRejection, notifyDocumentReview, notifyProgressReview, createNotification } from '../utils/notificationService.js';
+import Mark from '../models/Mark.js';
+import { notifyProjectApproval, notifyProjectRejection, notifyDocumentReview, notifyProgressReview, notifyMarksAssigned, createNotification } from '../utils/notificationService.js';
 import { sendMail } from '../utils/mailer.js';
 
 // Get assigned students (ownership-based)
@@ -826,6 +827,53 @@ export const reviewProgress = async (req, res) => {
     await notifyProgressReview(progress, req.user.name);
 
     res.json({ status: 'success', data: progress });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// Assign Marks
+export const assignMarks = async (req, res) => {
+  try {
+    const { studentId, projectId, titleMarks, progressMarks, documentMarks, interactionMarks, finalReviewMarks, remarks } = req.body;
+    
+    const totalMarks = Number(titleMarks) + Number(progressMarks) + Number(documentMarks) + Number(interactionMarks) + Number(finalReviewMarks);
+
+    let mark = await Mark.findOne({ studentId, projectId });
+    
+    if (mark) {
+      // Update existing
+      mark.titleMarks = titleMarks;
+      mark.progressMarks = progressMarks;
+      mark.documentMarks = documentMarks;
+      mark.interactionMarks = interactionMarks;
+      mark.finalReviewMarks = finalReviewMarks;
+      mark.totalMarks = totalMarks;
+      mark.remarks = remarks;
+      mark.evaluatedBy = req.user._id;
+      mark.evaluatedAt = Date.now();
+      await mark.save();
+    } else {
+      // Create new
+      mark = await Mark.create({
+        studentId,
+        projectId,
+        titleMarks,
+        progressMarks,
+        documentMarks,
+        interactionMarks,
+        finalReviewMarks,
+        totalMarks,
+        remarks,
+        evaluatedBy: req.user._id
+      });
+    }
+
+    const populatedMark = await Mark.findById(mark._id).populate('studentId', 'name email');
+    
+    await notifyMarksAssigned(populatedMark, req.user.name);
+
+    res.json({ status: 'success', data: mark });
   } catch (error) {
     res.status(500).json({ status: 'error', message: error.message });
   }
