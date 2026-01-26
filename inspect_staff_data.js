@@ -30,3 +30,26 @@ const run = async () => {
 };
 
 run();
+
+// # Server Configuration
+// PORT=5000
+// NODE_ENV=development
+
+// # MongoDB Connection
+// MONGODB_URI=mongodb+srv://logeskumarr2004_db_user:1234@cluster0.pa1abpq.mongodb.net/?appName=Cluster0
+
+// # JWT Secret (Change this to a random secure string in production)
+// JWT_SECRET=loges123
+// JWT_EXPIRE=7d
+
+// # CORS Origin (Frontend URL)
+// CLIENT_URL=http://localhost:5173
+
+
+
+
+// EMAIL_SERVICE=gmail
+// EMAIL_USER=logeskumarr2004@gmail.com
+// EMAIL_PASS=zlkc qvvg ywrx uhvl
+
+
