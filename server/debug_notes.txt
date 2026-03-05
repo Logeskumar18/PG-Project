@@ -1,0 +1,30 @@
+import axios from 'axios';
+import dotenv from 'dotenv';
+dotenv.config();
+
+const API_URL = 'http://localhost:5000/api';
+
+const run = async () => {
+  try {
+    // 1. Login
+    console.log('Logging in as vijay...');
+    const loginRes = await axios.post(`${API_URL}/auth/login`, {
+      email: 'vijay@example.com', // Assuming email based on name 'vijay', or I should check the DB for email first.
+      password: 'password123', // Assuming a default password, or I need to create a test user or reset password.
+      role: 'Staff'
+    });
+    
+    // Wait, I don't know the password for 'vijay'. 
+    // I should create a new temporary Staff user to test this, OR check the logs if the user refreshes. 
+    // But I can't see the real server logs easily unless I read the terminal (which is a different tool).
+    // I will read the terminal if I can? No, I don't have access to the running server terminal output unless I started it.
+    // The user has the server running.
+    
+    // Alternative: I will modify the controller to RETURN the debug info in the response temporarily, so I can see it in the frontend or via a simple fetch if I could auth.
+    
+    // Better: Write a script that uses Mongoose directly to simulate the controller logic EXACTLY, using the ID we know 'vijay' has.
+    
+  } catch (error) {
+    console.error(error);
+  }
+};

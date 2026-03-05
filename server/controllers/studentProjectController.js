@@ -1,0 +1,392 @@
+import Staff from '../models/Staff.js';
+import { sendMail } from '../utils/mailer.js';
+// Student updates their own project
+export const updateMyProject = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { title, description } = req.body;
+
+    const student = await Student.findOne({ email: req.user.email });
+    if (!student) {
+      return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    const project = await Project.findOneAndUpdate(
+      { studentId: student._id },
+      { 
+        title, 
+        description,
+        approvalStatus: 'Pending', // Reset approval status on update (Resubmission)
+        status: 'Submitted'
+      },
+      { new: true }
+    );
+    if (!project) {
+      return res.status(404).json({ message: 'No project found to update' });
+    }
+
+    // Notify Guide via Email about Resubmission
+    if (project.assignedGuideId) {
+      const guide = await Staff.findById(project.assignedGuideId);
+      if (guide) {
+        await sendMail({
+          to: guide.email,
+          subject: `⏳ Project approval pending for Student ID: ${student.studentId}`,
+          text: `Dear ${guide.name},\n\nThe student ${student.name} (${student.studentId}) has updated/resubmitted their project "${title}". It is now pending your approval.\n\nRegards,\nProject Portal`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+              <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto;">
+                <h2 style="color: #4f46e5;">Project Resubmission</h2>
+                <p>Dear <strong>${guide.name}</strong>,</p>
+                <p>The student <strong>${student.name}</strong> (ID: ${student.studentId}) has updated their project details.</p>
+                <div style="background-color: #f9fafb; padding: 15px; border-left: 4px solid #4f46e5; margin: 20px 0;">
+                  <p style="margin: 0;"><strong>Project:</strong> ${title}</p>
+                  <p style="margin: 5px 0 0;"><strong>Status:</strong> Pending Approval</p>
+                </div>
+                <p>Please login to the portal to review and approve/reject this submission.</p>
+              </div>
+            </div>
+          `
+        });
+      }
+    }
+
+    res.json({ success: true, message: 'Project updated', data: project });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating project', error: error.message });
+  }
+};
+import Project from '../models/Project.js';
+import Team from '../models/Team.js';
+import Student from '../models/Student.js';
+import Document from '../models/Document.js';
+import Milestone from '../models/Milestone.js';
+import Progress from '../models/Progress.js';
+import multer from 'multer';
+import path from 'path';
+import { createNotification, notifyDocumentSubmission, notifyProgressSubmission } from '../utils/notificationService.js';
+
+// Configure multer for file uploads
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, 'uploads/'); // Make sure this directory exists
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({
+  storage: storage,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  },
+  fileFilter: (req, file, cb) => {
+    const allowedTypes = /pdf|doc|docx|ppt|pptx|zip|rar|txt|jpg|jpeg|png/;
+    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+    const mimetype = allowedTypes.test(file.mimetype);
+
+    if (mimetype && extname) {
+      return cb(null, true);
+    } else {
+      cb(new Error('Invalid file type'));
+    }
+  }
+});
+
+// Student creates a project
+export const createProject = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { title, description } = req.body;
+
+    // Find the student profile
+    const student = await Student.findOne({ email: req.user.email });
+    if (!student) {
+      return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    // Allow multiple project submissions until one is approved
+
+    // Try to find the student's team and assign the guide
+    let assignedGuideId = null;
+    const team = await Team.findOne({ 'members.studentId': userId });
+    if (team && team.guideId) {
+      assignedGuideId = team.guideId;
+    }
+
+    // If no guide from team, assign the staff who created the student
+    if (!assignedGuideId) {
+      if (student.createdByStaffId) {
+        assignedGuideId = student.createdByStaffId;
+      }
+    }
+
+    const project = await Project.create({
+      studentId: student._id,
+      assignedGuideId,
+      title,
+      description,
+      status: 'Submitted',
+      approvalStatus: 'Pending',
+      submittedAt: new Date()
+    });
+
+    // Notify the assigned guide
+    if (assignedGuideId) {
+      await createNotification({
+        userId: assignedGuideId,
+        type: 'PROJECT_SUBMITTED',
+        title: 'New Project Submitted',
+        message: `A mapped student submitted project: ${title}`,
+        relatedTo: { type: 'Project', referenceId: project._id },
+        priority: 'High',
+        actionUrl: `/dashboard/staff?tab=approvals`
+      });
+
+      // Send Email to Guide
+      const guide = await Staff.findById(assignedGuideId);
+      if (guide) {
+        await sendMail({
+          to: guide.email,
+          subject: `⏳ Project approval pending for Student ID: ${student.studentId}`,
+          text: `Dear ${guide.name},\n\nA new project titled "${title}" has been submitted by student ${student.name} (ID: ${student.studentId}) and is pending your approval.\n\nRegards,\nProject Portal`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+              <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto;">
+                <h2 style="color: #4f46e5;">New Project Submission</h2>
+                <p>Dear <strong>${guide.name}</strong>,</p>
+                <p>A new project has been submitted for your approval.</p>
+                <div style="background-color: #f9fafb; padding: 15px; border-left: 4px solid #4f46e5; margin: 20px 0;">
+                  <p style="margin: 0;"><strong>Student:</strong> ${student.name} (${student.studentId})</p>
+                  <p style="margin: 5px 0 0;"><strong>Project:</strong> ${title}</p>
+                </div>
+                <p>Please login to the portal to review this submission.</p>
+              </div>
+            </div>
+          `
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Project submitted successfully',
+      data: project
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error submitting project', error: error.message });
+  }
+};
+
+// Student fetches their own projects
+export const getMyProject = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const student = await Student.findOne({ email: req.user.email });
+    if (!student) {
+      return res.status(404).json({ message: 'Student profile not found' });
+    }
+    const projects = await Project.find({ studentId: student._id }).sort({ createdAt: -1 });
+    if (projects.length === 0) {
+      return res.status(404).json({ message: 'No projects found' });
+    }
+    res.json({ success: true, data: projects });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching projects', error: error.message });
+  }
+};
+
+// Student uploads a document for their project
+export const uploadDocument = async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const { docType, comments } = req.body;
+    const file = req.file;
+
+    if (!file) {
+      return res.status(400).json({ message: 'No file uploaded' });
+    }
+
+    // Find the student profile
+    const student = await Student.findOne({ email: req.user.email });
+    if (!student) {
+      return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    // Find the student's latest project (any status)
+    const project = await Project.findOne({ studentId: userId }).sort({ createdAt: -1 });
+
+    if (!project) {
+      return res.status(404).json({ message: 'No project found. Please submit a project first.' });
+    }
+
+    const document = await Document.create({
+      projectId: project._id,
+      studentId: student._id,
+      type: docType,
+      fileName: file.originalname,
+      filePath: file.path,
+      comments: comments || ''
+    });
+
+    // Notify the assigned guide or staff
+    let notifyStaffId = project.assignedGuideId;
+    if (!notifyStaffId) {
+      if (student.createdByStaffId) {
+        notifyStaffId = student.createdByStaffId;
+      }
+    }
+
+    if (notifyStaffId) {
+      await notifyDocumentSubmission(document, req.user.name || 'A student');
+
+      // Send email notification to reviewer
+      const reviewer = await Staff.findById(notifyStaffId);
+      if (reviewer && reviewer.email) {
+        await sendMail({
+          to: reviewer.email,
+          subject: '📄 New project report uploaded for review',
+          text: `A new document has been uploaded for your review.\n\nStudent: ${student.name}\nDocument: ${document.type}\nFile: ${document.fileName}\n\nPlease log in to the portal to review the document.`,
+          html: `
+            <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+              <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto;">
+                <h2 style="color: #4f46e5;">📄 New Document Uploaded for Review</h2>
+                <p><strong>Student:</strong> ${student.name}</p>
+                <p><strong>Document Type:</strong> ${document.type}</p>
+                <p><strong>File Name:</strong> ${document.fileName}</p>
+                <p>Please log in to the portal to review this document.</p>
+              </div>
+            </div>
+          `
+        });
+      }
+    }
+
+    res.status(201).json({
+      success: true,
+      message: 'Document uploaded successfully',
+      data: document
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Error uploading document', error: error.message });
+  }
+};
+
+// Student fetches their uploaded documents
+export const getMyDocuments = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    
+    // Find student's projects first
+    const projects = await Project.find({ studentId }).select('_id');
+    const projectIds = projects.map(p => p._id);
+    
+    const documents = await Document.find({ 
+      projectId: { $in: projectIds },
+      studentId 
+    }).populate('projectId', 'title').sort({ uploadedAt: -1 });
+
+    res.json({ success: true, data: documents });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching documents', error: error.message });
+  }
+};
+
+// Get milestones for the student's projects
+export const getMyMilestones = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    
+    // Find student's projects: solo projects where studentId matches, or team projects where student is a member
+    const soloProjects = await Project.find({ studentId }).select('_id');
+    const teamProjects = await Project.find({ teamId: { $exists: true } })
+      .populate({
+        path: 'teamId',
+        match: { 'members.studentId': studentId },
+        select: '_id'
+      })
+      .select('_id teamId');
+    
+    const allProjects = [...soloProjects, ...teamProjects.filter(p => p.teamId)]; // filter out where populate failed
+    const projectIds = allProjects.map(p => p._id);
+    
+    const milestones = await Milestone.find({ 
+      projectId: { $in: projectIds },
+      studentId 
+    }).populate('projectId', 'title').populate('assignedBy', 'name').sort({ dueDate: 1 });
+
+    res.json({ success: true, data: milestones });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching milestones', error: error.message });
+  }
+};
+
+// Student submits progress update
+export const submitProgress = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const { projectId, weekNumber, progressPercentage, description, tasksCompleted, challenges, nextWeekPlan } = req.body;
+
+    // Verify the project belongs to the student
+    const project = await Project.findOne({ _id: projectId, studentId });
+    if (!project) {
+      return res.status(404).json({ message: 'Project not found or access denied' });
+    }
+
+    const progress = await Progress.create({
+      projectId,
+      studentId,
+      weekNumber,
+      progressPercentage,
+      description,
+      tasksCompleted,
+      challenges,
+      nextWeekPlan
+    });
+
+    // Notify the assigned guide
+    // Fetch project with guide populated to ensure we have email for notification
+    const projectWithGuide = await Project.findById(projectId).populate('assignedGuideId');
+    await notifyProgressSubmission(progress, projectWithGuide, 'Project');
+
+    res.json({ success: true, message: 'Progress submitted successfully', data: progress });
+  } catch (error) {
+    res.status(500).json({ message: 'Error submitting progress', error: error.message });
+  }
+};
+
+// Student updates milestone status
+export const updateMilestoneStatus = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const { milestoneId, status } = req.body;
+
+    // Find the milestone and ensure it belongs to the student
+    const milestone = await Milestone.findOne({ _id: milestoneId, studentId });
+    if (!milestone) {
+      return res.status(404).json({ message: 'Milestone not found or access denied' });
+    }
+
+    milestone.status = status;
+    await milestone.save();
+
+    // Notify the assigned staff
+    if (milestone.assignedBy) {
+      await createNotification({
+        userId: milestone.assignedBy,
+        type: 'MILESTONE_UPDATED',
+        title: 'Milestone Status Updated',
+        message: `Student updated milestone status to ${status} for: ${milestone.title}`,
+        relatedTo: { type: 'Milestone', referenceId: milestone._id },
+        priority: 'Medium',
+        actionUrl: `/dashboard/staff?tab=milestones`
+      });
+    }
+
+    res.json({ success: true, message: 'Milestone status updated', data: milestone });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating milestone status', error: error.message });
+  }
+};
