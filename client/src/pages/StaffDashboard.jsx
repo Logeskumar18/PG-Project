@@ -277,53 +277,17 @@ const StaffDashboard = () => {
   };
 
   const handleApproveDocument = async (doc) => {
-    try {
-      const documentId = doc._id || doc.id;
-      const response = await api.post(`/staff/documents/${documentId}/review`, {
-        reviewStatus: 'Approved',
-        remarks: 'Approved'
-      });
-
-      if (response.data.status === 'success') {
-        setDocuments(documents.map(d =>
-          (d._id || d.id) === documentId
-            ? response.data.data
-            : d
-        ));
-        setSuccessMessage('Document approved successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setSuccessMessage('Failed to approve document');
-      }
-    } catch (error) {
-      setSuccessMessage('Error approving document: ' + (error.response?.data?.message || error.message));
-      setTimeout(() => setSuccessMessage(''), 5000);
-    }
+    setSelectedDocument(doc);
+    setReviewStatus('Approved');
+    setReviewRemarks('');
+    setShowReviewModal(true);
   };
 
   const handleRejectDocument = async (doc) => {
-    try {
-      const documentId = doc._id || doc.id;
-      const response = await api.post(`/staff/documents/${documentId}/review`, {
-        reviewStatus: 'Rejected',
-        remarks: 'Rejected'
-      });
-
-      if (response.data.status === 'success') {
-        setDocuments(documents.map(d =>
-          (d._id || d.id) === documentId
-            ? response.data.data
-            : d
-        ));
-        setSuccessMessage('Document rejected');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      } else {
-        setSuccessMessage('Failed to reject document');
-      }
-    } catch (error) {
-      setSuccessMessage('Error rejecting document: ' + (error.response?.data?.message || error.message));
-      setTimeout(() => setSuccessMessage(''), 5000);
-    }
+    setSelectedDocument(doc);
+    setReviewStatus('Rejected');
+    setReviewRemarks('');
+    setShowReviewModal(true);
   };
 
   const handleCreateStudent = async (e) => {
@@ -633,6 +597,10 @@ const StaffDashboard = () => {
                                 {project.title || 'Untitled Project'}
                               </h6>
 
+                              <p className="text-muted mb-2 small">
+                                {project.description || 'No description provided.'}
+                              </p>
+
                               <small className="text-muted">
                                 Submitted by{' '}
                                 <strong>
@@ -689,49 +657,6 @@ const StaffDashboard = () => {
                                 ...
                               </Modal>
 
-                              {/* Document Review Modal */}
-                              <Modal show={showReviewModal} onHide={() => setShowReviewModal(false)} centered>
-                                ...
-                              </Modal>
-
-                              {/* ===== ADD HERE: Edit Project Modal ===== */}
-                              <Modal show={showEditModal} onHide={() => setShowEditModal(false)} centered>
-                                <Modal.Header closeButton>
-                                  <Modal.Title>Edit Project</Modal.Title>
-                                </Modal.Header>
-                                <Modal.Body>
-                                  <Form>
-                                    <Form.Group className="mb-3">
-                                      <Form.Label>Project Title</Form.Label>
-                                      <Form.Control
-                                        value={editTitle}
-                                        onChange={(e) => setEditTitle(e.target.value)}
-                                      />
-                                    </Form.Group>
-
-                                    <Form.Group>
-                                      <Form.Label>Description</Form.Label>
-                                      <Form.Control
-                                        as="textarea"
-                                        rows={3}
-                                        value={editDescription}
-                                        onChange={(e) => setEditDescription(e.target.value)}
-                                      />
-                                    </Form.Group>
-                                  </Form>
-                                </Modal.Body>
-                                <Modal.Footer>
-                                  <Button variant="secondary" onClick={() => setShowEditModal(false)}>
-                                    Cancel
-                                  </Button>
-                                  <Button variant="primary" onClick={handleEditProject}>
-                                    Save Changes
-                                  </Button>
-                                </Modal.Footer>
-                              </Modal>
-                              {/* ===== END Edit Project Modal ===== */}
-
-
                             </div>
                           </div>
                         );
@@ -765,22 +690,24 @@ const StaffDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {projects.map(project => (
-                        <tr key={project._id}>
-                          <td className="fw-semibold">{project.title}</td>
-                          <td>{project.studentId?.name || 'N/A'}</td>
-                          <td><Badge bg={project.status === 'Evaluated' || project.status === 'Approved' ? 'success' : 'warning'}>{project.status || 'Pending'}</Badge></td>
-                          <td>
-                            <Button 
-                              variant="primary" 
-                              size="sm"
-                              onClick={() => handleOpenMarksModal(project)}
-                            >
-                              Evaluate / Add Marks
-                            </Button>
-                          </td>
-                        </tr>
-                      ))}
+                      {projects
+                        .filter(project => (project.approvalStatus || project.approval) === 'Approved')
+                        .map(project => (
+                          <tr key={project._id}>
+                            <td className="fw-semibold">{project.title}</td>
+                            <td>{project.studentId?.name || 'N/A'}</td>
+                            <td><Badge bg={project.status === 'Evaluated' || project.status === 'Approved' ? 'success' : 'warning'}>{project.status || 'Pending'}</Badge></td>
+                            <td>
+                              <Button 
+                                variant="primary" 
+                                size="sm"
+                                onClick={() => handleOpenMarksModal(project)}
+                              >
+                                Evaluate / Add Marks
+                              </Button>
+                            </td>
+                          </tr>
+                        ))}
                     </tbody>
                   </Table>
                 </Card.Body>
@@ -802,7 +729,8 @@ const StaffDashboard = () => {
                         <th>Document Type</th>
                         <th>File Name</th>
                         <th>Student</th>
-                        {/* <th>Status</th> */}
+                        <th>Status</th>
+                        <th>Remarks</th>
                         <th>Uploaded</th>
                         <th>Actions</th>
                       </tr>
@@ -813,11 +741,12 @@ const StaffDashboard = () => {
                           <td><Badge bg="info">{doc.type?.toUpperCase() || 'DOC'}</Badge></td>
                           <td className="fw-semibold">{doc.fileName}</td>
                           <td>{doc.studentId?.name || 'N/A'}</td>
-                          {/* <td>
+                          <td>
                             <Badge bg={(doc.reviewStatus || doc.status) === 'Approved' ? 'success' : (doc.reviewStatus || doc.status) === 'Rejected' ? 'danger' : 'warning'}>
                               {doc.reviewStatus || doc.status || 'Pending'}
                             </Badge>
-                          </td> */}
+                          </td>
+                          <td className="text-muted small" style={{maxWidth: '250px', whiteSpace: 'normal'}}>{doc.remarks || '—'}</td>
                           <td>{doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : '—'}</td>
                           <td>
                             <Button
@@ -826,7 +755,7 @@ const StaffDashboard = () => {
                               className="me-2"
                               onClick={() => window.open(`http://localhost:5000/${doc.filePath}`, '_blank')}
                             >
-                              Download
+                              View
                             </Button>
                             {(doc.reviewStatus === 'Pending' || doc.status === 'Pending' || !doc.reviewStatus && !doc.status) && (
                               <>
@@ -891,6 +820,40 @@ const StaffDashboard = () => {
               onClick={handleSubmitReject}
             >
               ❌ Reject
+            </Button>
+          </Modal.Footer>
+        </Modal>
+
+        {/* Document Review Modal */}
+        <Modal show={showReviewModal} onHide={() => setShowReviewModal(false)} centered>
+          <Modal.Header closeButton>
+            <Modal.Title>Document Review - {reviewStatus}</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Form>
+              <Form.Group className="mb-3">
+                <Form.Label>Remarks {reviewStatus === 'Rejected' ? '(Required)' : '(Optional)'}</Form.Label>
+                <Form.Control
+                  as="textarea"
+                  rows={4}
+                  value={reviewRemarks}
+                  onChange={(e) => setReviewRemarks(e.target.value)}
+                  placeholder="Add your comments or feedback"
+                  required={reviewStatus === 'Rejected'}
+                />
+              </Form.Group>
+            </Form>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowReviewModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant={reviewStatus === 'Approved' ? 'success' : 'danger'}
+              onClick={handleSubmitReview}
+              disabled={reviewStatus === 'Rejected' && !reviewRemarks.trim()}
+            >
+              {reviewStatus === 'Approved' ? '✅ Approve' : '❌ Reject'}
             </Button>
           </Modal.Footer>
         </Modal>
@@ -1013,8 +976,7 @@ const StaffDashboard = () => {
                           <Form.Select name="department">
                             <option>Computer Science</option>
                             <option>Information Technology</option>
-                            <option>Electronics</option>
-                            <option>Mechanical</option>
+                          
                           </Form.Select>
                         </Form.Group>
                       </Col>

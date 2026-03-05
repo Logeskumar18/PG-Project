@@ -35,6 +35,12 @@ const StudentDashboard = () => {
   const [replyContent, setReplyContent] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
 
+  // Compose Modal State
+  const [showComposeModal, setShowComposeModal] = useState(false);
+  const [composeSubject, setComposeSubject] = useState('');
+  const [composeMessage, setComposeMessage] = useState('');
+  const [composeLoading, setComposeLoading] = useState(false);
+
   // Fetch announcements and projects
   const fetchAnnouncements = async () => {
     try {
@@ -98,7 +104,14 @@ const StudentDashboard = () => {
     try {
       const response = await api.get('/marks/my-marks');
       if (response.data.data) {
-        setEvaluation(response.data.data);
+        // Handle if response is array or object
+        let data = response.data.data;
+        if (Array.isArray(data)) {
+            // Sort by evaluatedAt desc to get latest
+            data.sort((a, b) => new Date(b.evaluatedAt) - new Date(a.evaluatedAt));
+            data = data.length > 0 ? data[0] : null;
+        }
+        setEvaluation(data);
       }
     } catch (error) {
       console.error('Error fetching evaluation:', error);
@@ -118,6 +131,9 @@ const StudentDashboard = () => {
   useEffect(() => {
     if (activeTab === 'submissions') {
       fetchDocuments();
+    }
+    if (activeTab === 'evaluation') {
+      fetchEvaluation();
     }
   }, [activeTab]);
 
@@ -288,6 +304,43 @@ const StudentDashboard = () => {
     }
   };
 
+  const handleComposeSubmit = async (e) => {
+    e.preventDefault();
+    
+    let receiverId = null;
+    if (projects.length > 0 && projects[0].assignedGuideId) {
+        receiverId = projects[0].assignedGuideId._id || projects[0].assignedGuideId;
+    }
+
+    if (!receiverId) {
+        setSuccessMessage("You don't have an assigned guide to message yet.");
+        setShowComposeModal(false);
+        setTimeout(() => setSuccessMessage(''), 3000);
+        return;
+    }
+
+    try {
+      setComposeLoading(true);
+      await api.post('/communication/messages', {
+        receiverId,
+        subject: composeSubject,
+        message: composeMessage,
+        priority: 'Medium'
+      });
+      setSuccessMessage('Message sent successfully!');
+      setShowComposeModal(false);
+      setComposeSubject('');
+      setComposeMessage('');
+      fetchMessages();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      setSuccessMessage('Error sending message: ' + (error.response?.data?.message || error.message));
+      setTimeout(() => setSuccessMessage(''), 5000);
+    } finally {
+      setComposeLoading(false);
+    }
+  };
+
   const handleLogout = () => {
     logout();
     navigate('/login/student');
@@ -295,6 +348,27 @@ const StudentDashboard = () => {
 
   return (
     <div className="min-vh-100" style={{ background: '#f8f9fa' }}>
+      <style>
+        {`
+          @media print {
+            body * {
+              visibility: hidden;
+            }
+            #printable-evaluation, #printable-evaluation * {
+              visibility: visible;
+            }
+            #printable-evaluation {
+              position: absolute;
+              left: 0;
+              top: 0;
+              width: 100%;
+            }
+            .no-print {
+              display: none !important;
+            }
+          }
+        `}
+      </style>
       {/* Navbar */}
       <div className="bg-white shadow-sm py-3 sticky-top">
         <Container fluid className="px-4">
@@ -352,13 +426,13 @@ const StudentDashboard = () => {
           >
             📝 Evaluation
           </Button>
-          <Button
+          {/* <Button
             variant={activeTab === 'feedback' ? 'primary' : 'light'}
             onClick={() => setActiveTab('feedback')}
             className="fw-semibold"
           >
             💬 Feedback
-          </Button>
+          </Button> */}
           <Button
             variant={activeTab === 'status' ? 'primary' : 'light'}
             onClick={() => setActiveTab('status')}
@@ -504,32 +578,42 @@ const StudentDashboard = () => {
                   </Card.Body>
                 </Card>
               ) : (
-                <Card className="border-0 shadow-sm">
-                  <Card.Body className="p-4">
-                    <div className="d-flex justify-content-between align-items-start mb-4 pb-3 border-bottom">
-                      <div>
-                        <h5 className="fw-bold mb-2">{projects[0].title}</h5>
-                        <small className="text-muted">Submitted on {projects[0].submissionDate ? new Date(projects[0].submissionDate).toLocaleDateString() : (projects[0].submittedAt ? new Date(projects[0].submittedAt).toLocaleDateString() : 'N/A')}</small>
-                      </div>
-                      <span className={`badge ${projects[0].approvalStatus === 'Approved' ? 'bg-success' : projects[0].approvalStatus === 'Rejected' ? 'bg-danger' : 'bg-info'}`}>{projects[0].approvalStatus || projects[0].status}</span>
-                    </div>
-                    <div className="mb-4">
-                      <h6 className="fw-semibold mb-2">Description:</h6>
-                      <p className="text-muted mb-0">{projects[0].description}</p>
-                    </div>
-                    {projects[0].approvalRemarks && (
-                      <div className="mb-4">
-                        <h6 className="fw-semibold mb-2">Staff Feedback:</h6>
-                        <p className="text-muted mb-0">{projects[0].approvalRemarks}</p>
-                      </div>
-                    )}
-                    {projects[0].approvalStatus !== 'Approved' && (
-                      <Button variant="outline-primary" onClick={() => setShowProjectModal(true)}>
-                        Submit Another Project
+                <div className="d-flex flex-column gap-4">
+                  {projects.length > 0 && projects[0].approvalStatus === 'Rejected' && (
+                    <div className="text-end">
+                      <Button 
+                        className="fw-semibold text-white"
+                        style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none' }}
+                        onClick={() => setShowProjectModal(true)}
+                      >
+                        Submit New Project Proposal
                       </Button>
-                    )}
-                  </Card.Body>
-                </Card>
+                    </div>
+                  )}
+                  {projects.map((project) => (
+                    <Card key={project._id} className="border-0 shadow-sm">
+                      <Card.Body className="p-4">
+                        <div className="d-flex justify-content-between align-items-start mb-4 pb-3 border-bottom">
+                          <div>
+                            <h5 className="fw-bold mb-2">{project.title}</h5>
+                            <small className="text-muted">Submitted on {project.submissionDate ? new Date(project.submissionDate).toLocaleDateString() : (project.submittedAt ? new Date(project.submittedAt).toLocaleDateString() : 'N/A')}</small>
+                          </div>
+                          <span className={`badge ${project.approvalStatus === 'Approved' ? 'bg-success' : project.approvalStatus === 'Rejected' ? 'bg-danger' : 'bg-info'}`}>{project.approvalStatus || project.status}</span>
+                        </div>
+                        <div className="mb-4">
+                          <h6 className="fw-semibold mb-2">Description:</h6>
+                          <p className="text-muted mb-0">{project.description}</p>
+                        </div>
+                        {project.approvalRemarks && (
+                          <div className="mb-4">
+                            <h6 className="fw-semibold mb-2">Staff Feedback:</h6>
+                            <p className="text-muted mb-0">{project.approvalRemarks}</p>
+                          </div>
+                        )}
+                      </Card.Body>
+                    </Card>
+                  ))}
+                </div>
               )}
             </Col>
           </Row>
@@ -605,7 +689,7 @@ const StudentDashboard = () => {
                           <small className="text-muted d-block mb-2">Project: {doc.projectId?.title || 'N/A'}</small>
                           {doc.comments && <small className="text-muted d-block mb-2">Comments: {doc.comments}</small>}
                           <small className="text-muted d-block">Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}</small>
-                          {doc.remarks && <small className="text-muted d-block">Staff Remarks: {doc.remarks}</small>}
+                          {doc.remarks && <small className="d-block mt-2 text-dark"><strong>Staff Remarks:</strong> {doc.remarks}</small>}
                         </div>
                       ))}
                     </div>
@@ -724,9 +808,15 @@ const StudentDashboard = () => {
         {activeTab === 'evaluation' && (
           <Row className="g-4">
             <Col lg={8} className="mx-auto">
-              <Card className="border-0 shadow-sm">
+              <Card className="border-0 shadow-sm" id="printable-evaluation">
                 <Card.Body className="p-5">
-                  <h5 className="fw-bold mb-4 text-center">📝 Project Evaluation</h5>
+                  <div className="d-flex justify-content-between align-items-center mb-4 no-print">
+                    <h5 className="fw-bold mb-0">📝 Project Evaluation</h5>
+                    <div className="d-flex gap-2">
+                      <Button variant="outline-primary" size="sm" onClick={() => window.print()}>🖨️ Print Marksheet</Button>
+                      <Button variant="outline-secondary" size="sm" onClick={fetchEvaluation}>🔄 Refresh</Button>
+                    </div>
+                  </div>
                   
                   {!evaluation ? (
                     <div className="text-center py-5 text-muted">
@@ -735,6 +825,12 @@ const StudentDashboard = () => {
                     </div>
                   ) : (
                     <div>
+                      <div className="d-none d-print-block text-center mb-4">
+                        <h3>Project Evaluation Marksheet</h3>
+                        <p className="mb-1"><strong>Student:</strong> {user?.name}</p>
+                        <p className="mb-1"><strong>ID:</strong> {user?.studentId}</p>
+                        <hr/>
+                      </div>
                       <div className="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded">
                         <h4 className="mb-0 fw-bold">Total Score</h4>
                         <h2 className="mb-0 fw-bold text-primary">{evaluation.totalMarks} / 40</h2>
@@ -932,7 +1028,16 @@ const StudentDashboard = () => {
             <Col lg={12}>
               <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
-                  <h5 className="fw-bold mb-4">💬 Messages</h5>
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h5 className="fw-bold mb-0">💬 Messages</h5>
+                    <Button 
+                      variant="primary" 
+                      size="sm"
+                      onClick={() => setShowComposeModal(true)}
+                    >
+                      ✉️ Compose
+                    </Button>
+                  </div>
                   {loadingMessages ? (
                     <div className="text-center text-muted py-4">Loading messages...</div>
                   ) : messages.length === 0 ? (
@@ -1020,6 +1125,57 @@ const StudentDashboard = () => {
                 disabled={replyLoading}
               >
                 {replyLoading ? 'Sending...' : 'Send Reply'}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* Compose Modal */}
+      <Modal show={showComposeModal} onHide={() => setShowComposeModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Compose Message to Guide</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleComposeSubmit}>
+            <Form.Group className="mb-3">
+              <Form.Label>To</Form.Label>
+              <Form.Control
+                value={projects.length > 0 && projects[0].assignedGuideId ? (projects[0].assignedGuideId.name || 'Guide') : 'No Guide Assigned'}
+                disabled
+                className="bg-light"
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Subject</Form.Label>
+              <Form.Control
+                value={composeSubject}
+                onChange={(e) => setComposeSubject(e.target.value)}
+                required
+                placeholder="Enter subject"
+              />
+            </Form.Group>
+            <Form.Group className="mb-4">
+              <Form.Label>Message</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={4}
+                value={composeMessage}
+                onChange={(e) => setComposeMessage(e.target.value)}
+                placeholder="Type your message here..."
+                required
+              />
+            </Form.Group>
+            <div className="d-flex gap-2 justify-content-end">
+              <Button variant="secondary" onClick={() => setShowComposeModal(false)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={composeLoading || !projects.length || !projects[0].assignedGuideId}
+              >
+                {composeLoading ? 'Sending...' : 'Send Message'}
               </Button>
             </div>
           </Form>

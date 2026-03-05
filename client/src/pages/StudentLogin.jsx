@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, Button, Alert, InputGroup, Modal } from 'react-bootstrap';
 
 const StudentLogin = () => {
   const [formData, setFormData] = useState({
@@ -10,6 +10,9 @@ const StudentLogin = () => {
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -62,11 +65,12 @@ const StudentLogin = () => {
       if (result.user.role === 'Student') {
         navigate('/dashboard/student');
       } else {
-        setErrors({ submit: 'Access denied. This portal is for Students only.' });
-        setTimeout(() => navigate('/'), 2000);
+        setErrorMessage('Access denied. This portal is for Students only.');
+        setShowError(true);
       }
     } else {
-      setErrors({ submit: result.error });
+      setErrorMessage(result.error || 'Login failed. Please check your credentials.');
+      setShowError(true);
     }
   };
 
@@ -91,11 +95,6 @@ const StudentLogin = () => {
                 </div>
 
                 <Form onSubmit={handleSubmit}>
-                  {errors.submit && (
-                    <Alert variant="danger" className="mb-3">
-                      {errors.submit}
-                    </Alert>
-                  )}
 
                   <Form.Group className="mb-3">
                     <Form.Label>Email Address</Form.Label>
@@ -116,19 +115,28 @@ const StudentLogin = () => {
 
                   <Form.Group className="mb-4">
                     <Form.Label>Password</Form.Label>
-                    <Form.Control
-                      type="password"
-                      name="password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      isInvalid={!!errors.password}
-                      placeholder="Enter your password"
-                      disabled={isSubmitting}
-                      size="lg"
-                    />
-                    <Form.Control.Feedback type="invalid">
-                      {errors.password}
-                    </Form.Control.Feedback>
+                    <InputGroup hasValidation>
+                      <Form.Control
+                        type={showPassword ? "text" : "password"}
+                        name="password"
+                        value={formData.password}
+                        onChange={handleChange}
+                        isInvalid={!!errors.password}
+                        placeholder="Enter your password"
+                        disabled={isSubmitting}
+                        size="lg"
+                      />
+                      <Button
+                        variant="outline-secondary"
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? "🙈" : "👁️"}
+                      </Button>
+                      <Form.Control.Feedback type="invalid">
+                        {errors.password}
+                      </Form.Control.Feedback>
+                    </InputGroup>
                   </Form.Group>
 
                   <Button 
@@ -154,6 +162,21 @@ const StudentLogin = () => {
           </Col>
         </Row>
       </Container>
+
+      {/* Error Modal */}
+      <Modal show={showError} onHide={() => setShowError(false)} centered>
+        <Modal.Header closeButton className="border-0">
+          <Modal.Title className="text-danger fw-bold">Login Failed</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center py-4">
+          <div className="mb-3" style={{ fontSize: '3rem' }}>⚠️</div>
+          <h5 className="fw-bold mb-2">Incorrect Credentials</h5>
+          <p className="text-muted">{errorMessage}</p>
+        </Modal.Body>
+        <Modal.Footer className="border-0 justify-content-center pb-4">
+          <Button variant="danger" className="px-4" onClick={() => setShowError(false)}>Try Again</Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };

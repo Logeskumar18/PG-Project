@@ -149,6 +149,7 @@ export const login = async (req, res) => {
       UserModel = Student;
     } else if (role === 'Staff') {
       UserModel = Staff;
+        console.warn(`[LOGIN FAIL] No user found for email: ${email}, role: ${role}`);
     } else if (role === 'HOD') {
       UserModel = HOD;
     } else {
@@ -157,6 +158,7 @@ export const login = async (req, res) => {
         message: 'Invalid role. Must be Student, Staff, HOD, or Guide'
       });
     }
+        console.warn(`[LOGIN FAIL] User inactive: ${email}, role: ${role}`);
 
     // Check if user exists (include password for comparison)
     const user = await UserModel.findOne({ email }).select('+password');
@@ -167,6 +169,7 @@ export const login = async (req, res) => {
         message: 'Invalid email or password'
       });
     }
+        console.warn(`[LOGIN FAIL] Wrong password for email: ${email}, role: ${role}`);
 
     // Check if user is active
     if (!user.isActive) {
@@ -178,7 +181,6 @@ export const login = async (req, res) => {
 
     // Check if password matches
     const isPasswordMatch = await user.comparePassword(password);
-
     if (!isPasswordMatch) {
       return res.status(401).json({
         status: 'error',
@@ -188,6 +190,16 @@ export const login = async (req, res) => {
 
     // Generate token
     const token = generateToken(user._id);
+
+    // Extra strict check before success response
+    if (!token || !user._id || !user.email) {
+      console.error(`[LOGIN ERROR] Missing token or user info for email: ${email}, role: ${role}`);
+      return res.status(500).json({
+        status: 'error',
+        message: 'Server error during login',
+        error: 'Missing token or user info'
+      });
+    }
 
     // Send Login Notification
     await notifyLogin(user, req);

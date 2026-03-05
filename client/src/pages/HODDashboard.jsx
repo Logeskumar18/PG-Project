@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { DEPARTMENTS } from '../constants/departments';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge, Table, ProgressBar, Spinner } from 'react-bootstrap';
@@ -6,6 +7,35 @@ import api from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 const HODDashboard = () => {
+    // Validation helpers
+    const validateName = (name) => {
+      return /^[A-Za-z ]{3,}$/.test(name.trim());
+    };
+    const validateEmployeeId = (id) => {
+      return /^EMP\d{3}$/.test(id.trim());
+    };
+    const validateEmail = (email) => {
+      return /^[\w.-]+@[\w.-]+\.[A-Za-z]{2,}$/.test(email.trim());
+    };
+    const validatePhone = (phone) => {
+      return /^\d{10}$/.test(phone.trim());
+    };
+    const validatePassword = (pw) => {
+      return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$/.test(pw);
+    };
+    // Uniqueness check helpers
+    const isUniqueEmployeeId = (id) => !staff.some(s => s.employeeId === id.trim());
+    const isUniqueEmail = (email) => !staff.some(s => s.email.toLowerCase() === email.trim().toLowerCase());
+    // Form state
+    const [staffForm, setStaffForm] = useState({
+      name: '',
+      employeeId: '',
+      department: '',
+      email: '',
+      phone: '',
+      password: ''
+    });
+    const [staffErrors, setStaffErrors] = useState({});
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
@@ -199,32 +229,40 @@ const HODDashboard = () => {
 
   const handleCreateStaff = async (e) => {
     e.preventDefault();
-    const formData = new FormData(e.target);
+    setErrorMessage('');
+    setStaffErrors({});
+    const { name, employeeId, department, email, phone, password } = staffForm;
+    const errors = {};
+    if (!validateName(name)) errors.name = 'Full Name must be at least 3 letters, only letters and spaces.';
+    if (!employeeId || !validateEmployeeId(employeeId)) errors.employeeId = 'Employee ID must be in format EMP001.';
+    else if (!isUniqueEmployeeId(employeeId)) errors.employeeId = 'Employee ID already exists.';
+    if (!department || !DEPARTMENTS.includes(department)) errors.department = 'Select a valid department.';
+    if (!email || !validateEmail(email)) errors.email = 'Enter a valid email address.';
+    else if (!isUniqueEmail(email)) errors.email = 'Email already exists.';
+    if (!phone || !validatePhone(phone)) errors.phone = 'Phone must be 10 digits.';
+    if (!password || !validatePassword(password)) errors.password = 'Password must be 8+ chars, include upper, lower, number, special.';
+    if (Object.keys(errors).length > 0) {
+      setStaffErrors(errors);
+      return;
+    }
+    setLoading(true);
     try {
-      setErrorMessage('');
-      setLoading(true);
-
       const staffData = {
-        name: formData.get('name'),
-        email: formData.get('email'),
-        employeeId: formData.get('employeeId'),
-        password: formData.get('password'),
-        department: formData.get('department'),
-        phone: formData.get('phone')
+        name: name.trim(),
+        employeeId: employeeId.trim(),
+        department,
+        email: email.trim(),
+        phone: phone.trim(),
+        password
       };
-
       const response = await api.post('/hod/staff', staffData);
-
       if (response.data.status === 'success') {
         setSuccessMessage('Staff member created successfully!');
         setShowCreateStaffModal(false);
-        e.target.reset();
-
+        setStaffForm({ name: '', employeeId: '', department: '', email: '', phone: '', password: '' });
         // Refresh staff list
         const staffRes = await api.get('/hod/staff');
-        if (staffRes.data.data) {
-          setStaff(staffRes.data.data);
-        }
+        if (staffRes.data.data) setStaff(staffRes.data.data);
         setTimeout(() => setSuccessMessage(''), 3000);
       }
     } catch (error) {
@@ -510,6 +548,9 @@ const HODDashboard = () => {
                           <div className="d-flex justify-content-between align-items-start mb-2">
                             <div className="flex-grow-1">
                               <h6 className="fw-bold mb-1">{project.title}</h6>
+                              <div className="mb-2 text-secondary" style={{ fontSize: '0.95em' }}>
+                                <b>Description:</b> {project.description || 'No description provided.'}
+                              </div>
                               <div className="d-flex gap-3">
                                 <small className="text-muted">Student: <strong>{project.studentId?.name || 'N/A'}</strong></small>
                                 <small className="text-muted">Guide: <strong>{project.assignedGuideId?.name || 'Unassigned'}</strong></small>
@@ -517,9 +558,6 @@ const HODDashboard = () => {
                               </div>
                             </div>
                             <div className="d-flex gap-2">
-                              <Badge bg={project.status === 'Completed' ? 'success' : 'info'}>
-                                {project.status}
-                              </Badge>
                               <Badge bg={project.approvalStatus === 'Approved' ? 'success' : project.approvalStatus === 'Rejected' ? 'danger' : 'warning'}>
                                 {project.approvalStatus}
                               </Badge>
@@ -875,39 +913,88 @@ const HODDashboard = () => {
           <Form onSubmit={handleCreateStaff}>
             <Form.Group className="mb-3">
               <Form.Label>Full Name</Form.Label>
-              <Form.Control name="name" required placeholder="e.g. Dr. John Doe" />
+              <Form.Control
+                name="name"
+                value={staffForm.name}
+                onChange={e => setStaffForm(f => ({ ...f, name: e.target.value }))}
+                required
+                placeholder="e.g. Dr. John Doe"
+                isInvalid={!!staffErrors.name}
+              />
+              <Form.Control.Feedback type="invalid">{staffErrors.name}</Form.Control.Feedback>
             </Form.Group>
-
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Employee ID</Form.Label>
-                  <Form.Control name="employeeId" required placeholder="e.g. EMP001" />
+                  <Form.Control
+                    name="employeeId"
+                    value={staffForm.employeeId}
+                    onChange={e => setStaffForm(f => ({ ...f, employeeId: e.target.value }))}
+                    required
+                    placeholder="e.g. EMP001"
+                    isInvalid={!!staffErrors.employeeId}
+                  />
+                  <Form.Control.Feedback type="invalid">{staffErrors.employeeId}</Form.Control.Feedback>
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Department</Form.Label>
-                  <Form.Control name="department" placeholder="e.g. Computer Science" />
+                  <Form.Select
+                    name="department"
+                    value={staffForm.department}
+                    onChange={e => setStaffForm(f => ({ ...f, department: e.target.value }))}
+                    required
+                    isInvalid={!!staffErrors.department}
+                  >
+                    <option value="">Select Department</option>
+                    {DEPARTMENTS.map(dep => (
+                      <option key={dep} value={dep}>{dep}</option>
+                    ))}
+                  </Form.Select>
+                  <Form.Control.Feedback type="invalid">{staffErrors.department}</Form.Control.Feedback>
                 </Form.Group>
               </Col>
             </Row>
-
             <Form.Group className="mb-3">
               <Form.Label>Email Address</Form.Label>
-              <Form.Control type="email" name="email" required placeholder="john@example.com" />
+              <Form.Control
+                type="email"
+                name="email"
+                value={staffForm.email}
+                onChange={e => setStaffForm(f => ({ ...f, email: e.target.value.trim() }))}
+                required
+                placeholder="john@example.com"
+                isInvalid={!!staffErrors.email}
+              />
+              <Form.Control.Feedback type="invalid">{staffErrors.email}</Form.Control.Feedback>
             </Form.Group>
-
             <Form.Group className="mb-3">
               <Form.Label>Phone Number</Form.Label>
-              <Form.Control name="phone" placeholder="+91 9876543210" />
+              <Form.Control
+                name="phone"
+                value={staffForm.phone}
+                onChange={e => setStaffForm(f => ({ ...f, phone: e.target.value.replace(/\D/g, '') }))}
+                required
+                placeholder="9876543210"
+                isInvalid={!!staffErrors.phone}
+              />
+              <Form.Control.Feedback type="invalid">{staffErrors.phone}</Form.Control.Feedback>
             </Form.Group>
-
             <Form.Group className="mb-4">
               <Form.Label>Password</Form.Label>
-              <Form.Control type="password" name="password" required minLength={6} placeholder="Min. 6 characters" />
+              <Form.Control
+                type="password"
+                name="password"
+                value={staffForm.password}
+                onChange={e => setStaffForm(f => ({ ...f, password: e.target.value }))}
+                required
+                placeholder="Min. 8 characters, upper, lower, number, special"
+                isInvalid={!!staffErrors.password}
+              />
+              <Form.Control.Feedback type="invalid">{staffErrors.password}</Form.Control.Feedback>
             </Form.Group>
-
             <div className="d-flex gap-2 justify-content-end">
               <Button variant="secondary" onClick={() => setShowCreateStaffModal(false)}>
                 Cancel

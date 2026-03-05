@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Container, Row, Col, Card, Form, Button, Alert } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, Button, Alert, Modal } from 'react-bootstrap';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -10,6 +10,8 @@ const Login = () => {
   });
   const [errors, setErrors] = useState({});
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showError, setShowError] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -70,7 +72,8 @@ const Login = () => {
         navigate('/dashboard/student');
       }
     } else {
-      setErrors({ submit: result.error });
+      setErrorMessage(result.error || 'Login failed. Please check your credentials.');
+      setShowError(true);
     }
   };
 
@@ -87,11 +90,6 @@ const Login = () => {
                 </div>
 
                 <Form onSubmit={handleSubmit}>
-                  {errors.submit && (
-                    <Alert variant="danger" className="mb-3">
-                      {errors.submit}
-                    </Alert>
-                  )}
 
                   <Form.Group className="mb-3">
                     <Form.Label>Email</Form.Label>
@@ -146,6 +144,21 @@ const Login = () => {
           </Col>
         </Row>
       </Container>
+
+      {/* Error Modal */}
+      <Modal show={showError} onHide={() => setShowError(false)} centered>
+        <Modal.Header closeButton className="border-0">
+          <Modal.Title className="text-danger fw-bold">Login Failed</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="text-center py-4">
+          <div className="mb-3" style={{ fontSize: '3rem' }}>⚠️</div>
+          <h5 className="fw-bold mb-2">Incorrect Credentials</h5>
+          <p className="text-muted">{errorMessage}</p>
+        </Modal.Body>
+        <Modal.Footer className="border-0 justify-content-center pb-4">
+          <Button variant="danger" className="px-4" onClick={() => setShowError(false)}>Try Again</Button>
+        </Modal.Footer>
+      </Modal>
     </div>
   );
 };
