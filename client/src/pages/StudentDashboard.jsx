@@ -1,11 +1,19 @@
+<<<<<<< HEAD
+=======
+
+>>>>>>> 625a125a15ecf7a9c8cfefe59f57d74e333aaa1c
 import { useState, useEffect } from 'react';
 import MyProfile from './MyProfile';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge } from 'react-bootstrap';
 import api from '../services/api';
+<<<<<<< HEAD
 import downloadPDF from '../utils/downloadPDF';
 import html2pdf from 'html2pdf.js'; // Ensure this import for Vite/React
+=======
+
+>>>>>>> 625a125a15ecf7a9c8cfefe59f57d74e333aaa1c
 
 
 const StudentDashboard = () => {
@@ -102,7 +110,11 @@ const StudentDashboard = () => {
 
   const fetchEvaluation = async () => {
     try {
+<<<<<<< HEAD
       const response = await api.get('/marks/my-marks');
+=======
+      const response = await api.get('/marks/my-marks-v2');
+>>>>>>> 625a125a15ecf7a9c8cfefe59f57d74e333aaa1c
       if (response.data.data) {
         // Handle if response is array or object
         let data = response.data.data;
@@ -814,7 +826,10 @@ const StudentDashboard = () => {
                     <h5 className="fw-bold mb-0">📝 Project Evaluation</h5>
                     <div className="d-flex gap-2">
                       <Button variant="outline-primary" size="sm" onClick={() => window.print()}>🖨️ Print Marksheet</Button>
+<<<<<<< HEAD
                       <Button variant="outline-success" size="sm" onClick={() => downloadPDF(document.getElementById('printable-evaluation'), `Marksheet_${user?.studentId || 'student'}.pdf`)}>⬇️ Download PDF</Button>
+=======
+>>>>>>> 625a125a15ecf7a9c8cfefe59f57d74e333aaa1c
                       <Button variant="outline-secondary" size="sm" onClick={fetchEvaluation}>🔄 Refresh</Button>
                     </div>
                   </div>
@@ -825,6 +840,7 @@ const StudentDashboard = () => {
                       <small>Your marks will appear here once your guide evaluates your project.</small>
                     </div>
                   ) : (
+<<<<<<< HEAD
                     <div className="marksheet-pdf-container p-4" style={{ background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px #e0e0e0', maxWidth: 700, margin: '0 auto' }}>
                       <div className="text-center mb-4">
                         <img src="/vite.svg" alt="Institute Logo" style={{ width: 60, marginBottom: 8 }} />
@@ -880,6 +896,46 @@ const StudentDashboard = () => {
                       </div>
                       <div className="text-end mt-4">
                         <span className="fw-bold">Evaluator Signature: ____________________</span>
+=======
+                    <div>
+                      <div className="d-none d-print-block text-center mb-4">
+                        <h3>Project Evaluation Marksheet</h3>
+                        <p className="mb-1"><strong>Student:</strong> {user?.name}</p>
+                        <p className="mb-1"><strong>ID:</strong> {user?.studentId}</p>
+                        <hr/>
+                      </div>
+                      <div className="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded">
+                        <h4 className="mb-0 fw-bold">Total Score</h4>
+                        <h2 className="mb-0 fw-bold text-primary">{evaluation.totalMarks} / 40</h2>
+                      </div>
+
+                      <div className="d-flex flex-column gap-3 mb-4">
+                        <div className="d-flex justify-content-between border-bottom pb-2">
+                          <span>Project Title & Abstract</span>
+                          <span className="fw-bold">{evaluation.titleMarks} / 5</span>
+                        </div>
+                        <div className="d-flex justify-content-between border-bottom pb-2">
+                          <span>Weekly Progress / Milestones</span>
+                          <span className="fw-bold">{evaluation.progressMarks} / 10</span>
+                        </div>
+                        <div className="d-flex justify-content-between border-bottom pb-2">
+                          <span>Document Quality</span>
+                          <span className="fw-bold">{evaluation.documentMarks} / 15</span>
+                        </div>
+                        <div className="d-flex justify-content-between border-bottom pb-2">
+                          <span>Guide Interaction</span>
+                          <span className="fw-bold">{evaluation.interactionMarks} / 5</span>
+                        </div>
+                        <div className="d-flex justify-content-between border-bottom pb-2">
+                          <span>Final Review</span>
+                          <span className="fw-bold">{evaluation.finalReviewMarks} / 5</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-light p-3 rounded">
+                        <h6 className="fw-bold">Remarks:</h6>
+                        <p className="mb-0 text-muted">{evaluation.remarks || 'No remarks provided.'}</p>
+>>>>>>> 625a125a15ecf7a9c8cfefe59f57d74e333aaa1c
                       </div>
                     </div>
                   )}
@@ -1199,6 +1255,15 @@ const StudentDashboard = () => {
           </Form>
         </Modal.Body>
       </Modal>
+<<<<<<< HEAD
+=======
+      {/* I am doing MERN Project for my final year college.
+      I do project in both home and college system.If i do project in
+      home i upload a project in git hub but in collge sytem dont have
+      git hub. so i how to push a project without install the git in
+      college system. in git hub my project is public repo.Give Simple step
+      to push or make branch */}
+>>>>>>> 625a125a15ecf7a9c8cfefe59f57d74e333aaa1c
 
       {/* Project Modal */}
       <Modal show={showProjectModal} onHide={() => setShowProjectModal(false)} size="lg" centered>
@@ -1245,3 +1310,9 @@ const StudentDashboard = () => {
 };
 
 export default StudentDashboard;
+<<<<<<< HEAD
+=======
+
+
+
+>>>>>>> 625a125a15ecf7a9c8cfefe59f57d74e333aaa1c

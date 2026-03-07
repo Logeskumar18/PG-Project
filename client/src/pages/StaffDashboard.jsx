@@ -559,7 +559,11 @@ const StaffDashboard = () => {
                           <td className="fw-semibold">{student.name}</td>
                           <td>{student.studentId}</td>
                           <td>{student.email}</td>
+<<<<<<< HEAD
                           <td><Badge bg="primary">{student.projectCount || student.projects || 0}</Badge></td>
+=======
+                          <td><Badge bg="primary">{student.projectCount  || student.projects || 0}</Badge></td>
+>>>>>>> 625a125a15ecf7a9c8cfefe59f57d74e333aaa1c
                           <td>
                             <Button variant="sm" size="sm" className="me-2" onClick={() => handleViewProfile(student)}>View Profile</Button>
                             {/* <Button variant="outline-secondary" size="sm">Send Message</Button> */}

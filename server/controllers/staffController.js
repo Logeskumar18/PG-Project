@@ -47,10 +47,18 @@ export const getAssignedStudents = async (req, res) => {
     const students = await Student.find({ _id: { $in: allStudentIds } })
       .select('name email studentId department createdByStaffId');
 
+<<<<<<< HEAD
     // For each student, find their project count
     const studentsWithProjects = await Promise.all(students.map(async (student) => {
       const projectCount = await Project.countDocuments({
         studentId: student._id
+=======
+    // For each student, find their approved project count
+    const studentsWithProjects = await Promise.all(students.map(async (student) => {
+      const projectCount = await Project.countDocuments({
+        studentId: student._id,
+        approvalStatus: 'Approved'
+>>>>>>> 625a125a15ecf7a9c8cfefe59f57d74e333aaa1c
       });
       return {
         ...student.toObject(),
