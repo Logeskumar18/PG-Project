@@ -1,5 +1,5 @@
 import express from 'express';
-import ProjectMarks from '../models/ProjectMarks.js';
+import Mark from '../models/Mark.js';
 import Project from '../models/Project.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -30,10 +30,10 @@ router.post("/assign-marks", protect, authorize('Staff'), async (req, res) => {
       return res.status(400).json({ message: "Marks cannot exceed 40" });
     }
 
-    const marks = await ProjectMarks.findOneAndUpdate(
+    const marks = await Mark.findOneAndUpdate(
       { studentId, projectId },
       {
-        staffId: req.user._id,
+        evaluatedBy: req.user._id,
         titleMarks,
         progressMarks,
         documentMarks,
@@ -65,7 +65,7 @@ router.post("/assign-marks", protect, authorize('Staff'), async (req, res) => {
 // Get Marks for Student (Student Only)
 router.get("/my-marks", protect, authorize('Student'), async (req, res) => {
   try {
-    const marks = await ProjectMarks.findOne({ studentId: req.user._id }).populate('projectId', 'title');
+    const marks = await Mark.findOne({ studentId: req.user._id }).populate('projectId', 'title');
     res.json({ success: true, data: marks });
   } catch (err) {
     res.status(500).json({ message: "Error fetching marks" });
@@ -75,10 +75,10 @@ router.get("/my-marks", protect, authorize('Student'), async (req, res) => {
 // Get All Marks (HOD)
 router.get("/all", protect, authorize('HOD'), async (req, res) => {
   try {
-    const marks = await ProjectMarks.find()
+    const marks = await Mark.find()
       .populate('studentId', 'name studentId')
       .populate('projectId', 'title')
-      .populate('staffId', 'name');
+      .populate('evaluatedBy', 'name');
     res.json({ success: true, data: marks });
   } catch (err) {
     res.status(500).json({ message: "Error fetching marks" });
@@ -86,3 +86,4 @@ router.get("/all", protect, authorize('HOD'), async (req, res) => {
 });
 
 export default router;
+

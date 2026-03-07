@@ -1,11 +1,11 @@
-
 import { useState, useEffect } from 'react';
 import MyProfile from './MyProfile';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge } from 'react-bootstrap';
 import api from '../services/api';
-
+import downloadPDF from '../utils/downloadPDF';
+import html2pdf from 'html2pdf.js'; // Ensure this import for Vite/React
 
 
 const StudentDashboard = () => {
@@ -814,6 +814,7 @@ const StudentDashboard = () => {
                     <h5 className="fw-bold mb-0">📝 Project Evaluation</h5>
                     <div className="d-flex gap-2">
                       <Button variant="outline-primary" size="sm" onClick={() => window.print()}>🖨️ Print Marksheet</Button>
+                      <Button variant="outline-success" size="sm" onClick={() => downloadPDF(document.getElementById('printable-evaluation'), `Marksheet_${user?.studentId || 'student'}.pdf`)}>⬇️ Download PDF</Button>
                       <Button variant="outline-secondary" size="sm" onClick={fetchEvaluation}>🔄 Refresh</Button>
                     </div>
                   </div>
@@ -824,44 +825,61 @@ const StudentDashboard = () => {
                       <small>Your marks will appear here once your guide evaluates your project.</small>
                     </div>
                   ) : (
-                    <div>
-                      <div className="d-none d-print-block text-center mb-4">
-                        <h3>Project Evaluation Marksheet</h3>
+                    <div className="marksheet-pdf-container p-4" style={{ background: '#fff', borderRadius: 12, boxShadow: '0 2px 12px #e0e0e0', maxWidth: 700, margin: '0 auto' }}>
+                      <div className="text-center mb-4">
+                        <img src="/vite.svg" alt="Institute Logo" style={{ width: 60, marginBottom: 8 }} />
+                        <h2 className="fw-bold mb-1" style={{ color: '#667eea' }}>Project Evaluation Marksheet</h2>
                         <p className="mb-1"><strong>Student:</strong> {user?.name}</p>
                         <p className="mb-1"><strong>ID:</strong> {user?.studentId}</p>
-                        <hr/>
+                        <p className="mb-1"><strong>Department:</strong> {user?.department}</p>
+                        <hr style={{ borderTop: '2px solid #667eea', width: '60%', margin: '16px auto' }} />
                       </div>
-                      <div className="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded">
+                      <div className="d-flex justify-content-between align-items-center mb-4 p-3 bg-light rounded-3">
                         <h4 className="mb-0 fw-bold">Total Score</h4>
                         <h2 className="mb-0 fw-bold text-primary">{evaluation.totalMarks} / 40</h2>
                       </div>
-
-                      <div className="d-flex flex-column gap-3 mb-4">
-                        <div className="d-flex justify-content-between border-bottom pb-2">
-                          <span>Project Title & Abstract</span>
-                          <span className="fw-bold">{evaluation.titleMarks} / 5</span>
-                        </div>
-                        <div className="d-flex justify-content-between border-bottom pb-2">
-                          <span>Weekly Progress / Milestones</span>
-                          <span className="fw-bold">{evaluation.progressMarks} / 10</span>
-                        </div>
-                        <div className="d-flex justify-content-between border-bottom pb-2">
-                          <span>Document Quality</span>
-                          <span className="fw-bold">{evaluation.documentMarks} / 15</span>
-                        </div>
-                        <div className="d-flex justify-content-between border-bottom pb-2">
-                          <span>Guide Interaction</span>
-                          <span className="fw-bold">{evaluation.interactionMarks} / 5</span>
-                        </div>
-                        <div className="d-flex justify-content-between border-bottom pb-2">
-                          <span>Final Review</span>
-                          <span className="fw-bold">{evaluation.finalReviewMarks} / 5</span>
-                        </div>
-                      </div>
-
-                      <div className="bg-light p-3 rounded">
-                        <h6 className="fw-bold">Remarks:</h6>
+                      <table className="table table-bordered mb-4" style={{ background: '#fafbfc' }}>
+                        <thead className="table-light">
+                          <tr>
+                            <th>Criteria</th>
+                            <th>Marks</th>
+                            <th>Max</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          <tr>
+                            <td>Project Title & Abstract</td>
+                            <td>{evaluation.titleMarks}</td>
+                            <td>5</td>
+                          </tr>
+                          <tr>
+                            <td>Weekly Progress / Milestones</td>
+                            <td>{evaluation.progressMarks}</td>
+                            <td>10</td>
+                          </tr>
+                          <tr>
+                            <td>Document Quality</td>
+                            <td>{evaluation.documentMarks}</td>
+                            <td>15</td>
+                          </tr>
+                          <tr>
+                            <td>Guide Interaction</td>
+                            <td>{evaluation.interactionMarks}</td>
+                            <td>5</td>
+                          </tr>
+                          <tr>
+                            <td>Final Review</td>
+                            <td>{evaluation.finalReviewMarks}</td>
+                            <td>5</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                      <div className="bg-light p-3 rounded mb-3">
+                        <h6 className="fw-bold mb-1">Remarks:</h6>
                         <p className="mb-0 text-muted">{evaluation.remarks || 'No remarks provided.'}</p>
+                      </div>
+                      <div className="text-end mt-4">
+                        <span className="fw-bold">Evaluator Signature: ____________________</span>
                       </div>
                     </div>
                   )}
