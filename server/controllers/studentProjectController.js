@@ -1,5 +1,48 @@
 import Staff from '../models/Staff.js';
 import { sendMail } from '../utils/mailer.js';
+import { spawn } from 'child_process';
+import Project from '../models/Project.js';
+import Team from '../models/Team.js';
+import Student from '../models/Student.js';
+import Document from '../models/Document.js';
+import Milestone from '../models/Milestone.js';
+import Progress from '../models/Progress.js';
+import multer from 'multer';
+import path from 'path';
+import { createNotification, notifyDocumentSubmission, notifyProgressSubmission } from '../utils/notificationService.js';
+import { fileURLToPath } from 'url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Helper function to check similarity using Python script
+const checkSimilarity = (newTitle, existingTitles) => {
+  return new Promise((resolve, reject) => {
+    const pythonProcess = spawn('python', [path.join(__dirname, '../utils/similarity.py')]);
+    let result = '';
+
+    pythonProcess.stdout.on('data', (data) => {
+      result += data.toString();
+    });
+
+    pythonProcess.on('close', (code) => {
+      if (code !== 0) {
+        console.error('Similarity check failed');
+        resolve({ score: 0 }); // Fail safe
+      } else {
+        try {
+          resolve(JSON.parse(result));
+        } catch (e) {
+          resolve({ score: 0 });
+        }
+      }
+    });
+
+    pythonProcess.stdin.write(JSON.stringify({ new_title: newTitle, existing_titles: existingTitles }));
+    pythonProcess.stdin.end();
+  });
+};
+
 // Student updates their own project
 export const updateMyProject = async (req, res) => {
   try {
@@ -9,6 +52,17 @@ export const updateMyProject = async (req, res) => {
     const student = await Student.findOne({ email: req.user.email });
     if (!student) {
       return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    // Check for title similarity
+    const existingProjects = await Project.find({ studentId: { $ne: student._id } }, 'title');
+    const existingTitles = existingProjects.map(p => p.title);
+    
+    const similarity = await checkSimilarity(title, existingTitles);
+    if (similarity.score > 0.70) { // 70% threshold
+      return res.status(400).json({ 
+        message: `Project title is ${Math.round(similarity.score * 100)}% similar to existing project: "${similarity.most_similar}". Please choose a unique title.` 
+      });
     }
 
     const project = await Project.findOneAndUpdate(
@@ -56,15 +110,6 @@ export const updateMyProject = async (req, res) => {
     res.status(500).json({ message: 'Error updating project', error: error.message });
   }
 };
-import Project from '../models/Project.js';
-import Team from '../models/Team.js';
-import Student from '../models/Student.js';
-import Document from '../models/Document.js';
-import Milestone from '../models/Milestone.js';
-import Progress from '../models/Progress.js';
-import multer from 'multer';
-import path from 'path';
-import { createNotification, notifyDocumentSubmission, notifyProgressSubmission } from '../utils/notificationService.js';
 
 // Configure multer for file uploads
 const storage = multer.diskStorage({
@@ -105,6 +150,17 @@ export const createProject = async (req, res) => {
     const student = await Student.findOne({ email: req.user.email });
     if (!student) {
       return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    // Check for title similarity
+    const existingProjects = await Project.find({}, 'title');
+    const existingTitles = existingProjects.map(p => p.title);
+    
+    const similarity = await checkSimilarity(title, existingTitles);
+    if (similarity.score > 0.70) { // 70% threshold
+      return res.status(400).json({ 
+        message: `Project title is ${Math.round(similarity.score * 100)}% similar to existing project: "${similarity.most_similar}". Please choose a unique title.` 
+      });
     }
 
     // Allow multiple project submissions until one is approved

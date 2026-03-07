@@ -16,6 +16,7 @@ const StudentDashboard = () => {
   const [projectDescription, setProjectDescription] = useState('');
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const [projects, setProjects] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [progressUpdates, setProgressUpdates] = useState([]);
@@ -139,6 +140,7 @@ const StudentDashboard = () => {
 
   const handleProjectSubmit = async (e) => {
     e.preventDefault();
+    setErrorMessage('');
     if (projectTitle.trim() && projectDescription.trim()) {
       try {
         const response = await api.post('/student/projects', {
@@ -156,8 +158,8 @@ const StudentDashboard = () => {
           setSuccessMessage('Project submitted, but no data returned.');
         }
       } catch (error) {
-        setSuccessMessage('Error submitting project: ' + (error.response?.data?.message || error.message));
-        setTimeout(() => setSuccessMessage(''), 5000);
+        setErrorMessage(error.response?.data?.message || 'Error submitting project');
+        setTimeout(() => setErrorMessage(''), 5000);
       }
     }
   };
@@ -386,6 +388,11 @@ const StudentDashboard = () => {
         {successMessage && (
           <Alert variant="success" dismissible onClose={() => setSuccessMessage('')} className="mb-4">
             ✅ {successMessage}
+          </Alert>
+        )}
+        {errorMessage && (
+          <Alert variant="danger" dismissible onClose={() => setErrorMessage('')} className="mb-4">
+            ⚠️ {errorMessage}
           </Alert>
         )}
 
