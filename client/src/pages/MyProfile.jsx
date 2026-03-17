@@ -17,7 +17,10 @@ const MyProfile = () => {
     confirmPassword: "",
   });
 
-  const [error, setError] = useState("");
+  const [profileError, setProfileError] = useState("");
+  const [passwordError, setPasswordError] = useState("");
+  const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
 
   // 🔔 Toast states
   const [showToast, setShowToast] = useState(false);
@@ -53,46 +56,71 @@ const MyProfile = () => {
   // Update profile
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setProfileError("");
+    setIsUpdatingProfile(true);
 
-    const result = await updateUser({
-      name: profile.name,
-      phone: profile.mobile,
-    });
+    try {
+      const result = await updateUser({
+        name: profile.name,
+        phone: profile.mobile,
+      });
 
-    if (result.success) {
-      setToastMessage("Profile updated successfully ✅");
-      setShowToast(true);
-    } else {
-      setError(result.error || "Failed to update profile");
+      if (result.success) {
+        setToastMessage("Profile updated successfully ✅");
+        setShowToast(true);
+      } else {
+        setProfileError(result.error || "Failed to update profile");
+      }
+    } catch (err) {
+      setProfileError("An unexpected error occurred while updating profile.");
+    } finally {
+      setIsUpdatingProfile(false);
     }
   };
 
   // Change password
   const handlePasswordSubmit = async (e) => {
     e.preventDefault();
-    setError("");
+    setPasswordError("");
 
-    if (passwords.newPassword !== passwords.confirmPassword) {
-      setError("New passwords do not match");
+    if (passwords.newPassword.length < 6) {
+      setPasswordError("New password must be at least 6 characters long.");
       return;
     }
 
-    const result = await updateUser({
-      password: passwords.newPassword,
-      currentPassword: passwords.currentPassword,
-    });
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      setPasswordError("New passwords do not match");
+      return;
+    }
 
-    if (result.success) {
-      setToastMessage("Password changed successfully 🔐");
-      setShowToast(true);
-      setPasswords({
-        currentPassword: "",
-        newPassword: "",
-        confirmPassword: "",
+    if (passwords.newPassword === passwords.currentPassword) {
+      setPasswordError("New password cannot be the same as the current password.");
+      return;
+    }
+
+    setIsUpdatingPassword(true);
+
+    try {
+      const result = await updateUser({
+        password: passwords.newPassword,
+        currentPassword: passwords.currentPassword,
       });
-    } else {
-      setError(result.error || "Failed to change password");
+
+      if (result.success) {
+        setToastMessage("Password changed successfully 🔐");
+        setShowToast(true);
+        setPasswords({
+          currentPassword: "",
+          newPassword: "",
+          confirmPassword: "",
+        });
+      } else {
+        setPasswordError(result.error || "Failed to change password");
+      }
+    } catch (err) {
+      setPasswordError("An unexpected error occurred while changing password.");
+    } finally {
+      setIsUpdatingPassword(false);
     }
   };
 
@@ -103,6 +131,7 @@ const MyProfile = () => {
         className={`toast position-fixed top-0 end-0 m-4 ${
           showToast ? "show" : "hide"
         }`}
+        style={{ zIndex: 1055 }}
         role="alert"
       >
         <div className="toast-header bg-success text-white">
@@ -164,8 +193,18 @@ const MyProfile = () => {
                     />
                   </div>
 
-                  <button className="btn btn-primary w-100">
-                    Update Profile
+                  {profileError && (
+                    <motion.div
+                      className="alert alert-danger mt-3 py-2"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    >
+                      {profileError}
+                    </motion.div>
+                  )}
+
+                  <button className="btn btn-primary w-100" disabled={isUpdatingProfile} type="submit">
+                    {isUpdatingProfile ? "Updating..." : "Update Profile"}
                   </button>
                 </form>
 
@@ -213,21 +252,20 @@ const MyProfile = () => {
                     />
                   </div>
 
-                  <button className="btn btn-dark w-100">
-                    Change Password
+                  {passwordError && (
+                    <motion.div
+                      className="alert alert-danger mt-3 py-2"
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                    >
+                      {passwordError}
+                    </motion.div>
+                  )}
+
+                  <button className="btn btn-dark w-100" disabled={isUpdatingPassword} type="submit">
+                    {isUpdatingPassword ? "Changing..." : "Change Password"}
                   </button>
                 </form>
-
-                {/* Error */}
-                {error && (
-                  <motion.div
-                    className="alert alert-danger mt-3"
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                  >
-                    {error}
-                  </motion.div>
-                )}
               </div>
             </div>
           </div>
