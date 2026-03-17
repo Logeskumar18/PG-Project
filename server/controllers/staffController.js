@@ -8,6 +8,7 @@ import Mark from '../models/Mark.js';
 import { notifyProjectApproval, notifyProjectRejection, notifyDocumentReview, notifyProgressReview, notifyMarksAssigned, createNotification } from '../utils/notificationService.js';
 import { sendMail } from '../utils/mailer.js';
 import Student from '../models/Student.js';
+import mongoose from "mongoose";
 
 // Get assigned students (ownership-based + project-assigned)
 export const getAssignedStudents = async (req, res) => {
@@ -117,7 +118,8 @@ export const approveProject = async (req, res) => {
       projectId,
       {
         approvalStatus: 'Approved',
-        status: 'Approved',
+        status: 'In Progress',
+        stage: 'Proposal Approved',
         approvalRemarks: remarks,
         approvedAt: new Date()
       },
@@ -255,7 +257,8 @@ export const rejectProject = async (req, res) => {
       projectId,
       {
         approvalStatus: 'Rejected',
-        status: 'Rejected',
+        status: 'Submitted',
+        stage: 'Proposal Submitted',
         approvalRemarks: remarks,
         approvedAt: new Date()
       },
@@ -513,8 +516,7 @@ export const reviewDocument = async (req, res) => {
       message: error.message
     });
   }
-}; import mongoose from "mongoose";
-
+};
 // Create milestone/task
 export const createMilestone = async (req, res) => {
   try {
@@ -674,11 +676,15 @@ export const updateMilestoneStatus = async (req, res) => {
 export const updateProjectStatus = async (req, res) => {
   try {
     const { projectId } = req.params;
-    const { status } = req.body;
+    const { status, stage } = req.body;
+
+    const updateData = {};
+    if (status) updateData.status = status;
+    if (stage) updateData.stage = stage;
 
     const project = await Project.findOneAndUpdate(
       { _id: projectId, assignedGuideId: req.user._id },
-      { status },
+      updateData,
       { new: true }
     ).populate('studentId', 'name email');
 

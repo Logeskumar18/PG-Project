@@ -1,14 +1,12 @@
+
+import { downloadDocument as staffDownloadDocument } from '../controllers/studentProjectController.js';
 import express from 'express';
 import * as staffController from '../controllers/staffController.js';
 import * as studentMgmtController from '../controllers/studentManagementController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import { staffOwnsStudent } from '../middleware/ownershipMiddleware.js';
 
-const router = express.Router();
-
-/**
- * Staff role middleware
- */
+// Staff role middleware (must be defined before use)
 const isStaff = (req, res, next) => {
   if (req.user.role !== 'Staff') {
     return res.status(403).json({
@@ -18,6 +16,10 @@ const isStaff = (req, res, next) => {
   }
   next();
 };
+
+const router = express.Router();
+// Staff download document by ID (must be after router is initialized)
+router.get('/documents/:documentId/download', protect, isStaff, staffDownloadDocument);
 
 /* ============================
    DASHBOARD

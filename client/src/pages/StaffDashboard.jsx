@@ -25,6 +25,7 @@ const StaffDashboard = () => {
   const [projects, setProjects] = useState([]);
   const [documents, setDocuments] = useState([]);
   const [progressUpdates, setProgressUpdates] = useState([]);
+  const [deadlines, setDeadlines] = useState([]);
 
   // Fetch staff-scoped data
   const fetchData = async () => {
@@ -49,6 +50,11 @@ const StaffDashboard = () => {
       if (docsRes.data.data) setDocuments(docsRes.data.data);
       if (progressRes.data.data) setProgressUpdates(progressRes.data.data);
       if (messagesRes.data.data) setMessages(messagesRes.data.data);
+
+      const deadlinesRes = await api.get('/deadlines');
+      if (deadlinesRes.data?.data) {
+        setDeadlines(deadlinesRes.data.data);
+      }
     } catch (error) {
       console.error('Error loading staff data:', error);
     } finally {
@@ -102,6 +108,22 @@ const StaffDashboard = () => {
     remarks: ''
   });
   const [selectedProjectForMarks, setSelectedProjectForMarks] = useState(null);
+
+  const STAGES = ['Proposal Submitted', 'Proposal Approved', 'Development', 'Mid Review', 'Testing', 'Final Submission'];
+
+  const handleUpdateStage = async (projectId, newStage) => {
+    try {
+      const res = await api.put(`/staff/projects/${projectId}/status`, { stage: newStage });
+      if (res.data.status === 'success') {
+        setProjects(projects.map(p => (p._id || p.id) === projectId ? { ...p, stage: newStage } : p));
+        setSuccessMessage('Project stage updated successfully');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      }
+    } catch (err) {
+      setErrorMessage('Error updating stage: ' + (err.response?.data?.message || err.message));
+      setTimeout(() => setErrorMessage(''), 3000);
+    }
+  };
 
   const handleOpenMarksModal = (project) => {
     setSelectedProjectForMarks(project);
@@ -498,6 +520,29 @@ const StaffDashboard = () => {
               </Card>
             </Col>
 
+            {deadlines.length > 0 && (
+              <Col lg={12}>
+                <Card className="border-0 shadow-sm">
+                  <Card.Body className="p-4">
+                    <h5 className="fw-bold mb-4">⏰ Global Deadlines</h5>
+                    <div className="d-flex flex-column gap-3">
+                      {deadlines.map(deadline => (
+                        <div key={deadline._id} className="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center border-start border-4 border-warning">
+                          <div>
+                            <h6 className="fw-bold mb-1">{deadline.title === 'Other' ? deadline.customTitle : deadline.title}</h6>
+                            <p className="text-muted mb-0 small">{deadline.description}</p>
+                          </div>
+                          <div className="text-end">
+                            <div className="fw-bold text-danger">{new Date(deadline.date).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            )}
+
             <Col lg={12}>
               <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
@@ -598,7 +643,7 @@ const StaffDashboard = () => {
                               </h6>
 
                               <p className="text-muted mb-2 small">
-                                {project.description || 'No description provided.'}
+                                <b>Description:</b> {project.description || 'No description provided.'}
                               </p>
 
                               <small className="text-muted">
@@ -749,14 +794,25 @@ const StaffDashboard = () => {
                           <td className="text-muted small" style={{maxWidth: '250px', whiteSpace: 'normal'}}>{doc.remarks || '—'}</td>
                           <td>{doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : '—'}</td>
                           <td>
-                            <Button
-                              variant="outline-success"
-                              size="sm"
-                              className="me-2"
-                              onClick={() => window.open(`http://localhost:5000/${doc.filePath}`, '_blank')}
-                            >
-                              View
-                            </Button>
+                            {doc.cloudinaryUrl ? (
+                              <Button
+                                variant="outline-success"
+                                size="sm"
+                                className="me-2"
+                                onClick={() => window.open(doc.cloudinaryUrl, '_blank')}
+                              >
+                                View
+                              </Button>
+                            ) : (
+                              <Button
+                                variant="outline-success"
+                                size="sm"
+                                className="me-2"
+                                onClick={() => window.open(`/api/staff/documents/${doc._id || doc.id}/download`, '_blank')}
+                              >
+                                View
+                              </Button>
+                            )}
                             {(doc.reviewStatus === 'Pending' || doc.status === 'Pending' || !doc.reviewStatus && !doc.status) && (
                               <>
                                 <Button
@@ -862,9 +918,68 @@ const StaffDashboard = () => {
         {activeTab === 'progress' && (
           <Row className="g-4">
             <Col lg={12}>
+              <Card className="border-0 shadow-sm mb-4">
+                <Card.Body className="p-4">
+                  <h5 className="fw-bold mb-4">📈 Project Stage Tracker</h5>
+                  {projects.filter(p => (p.approvalStatus || p.approval) === 'Approved').length === 0 ? (
+                    <div className="text-center text-muted py-4">No approved projects yet</div>
+                  ) : (
+                    <div className="d-flex flex-column gap-4">
+                      {projects.filter(p => (p.approvalStatus || p.approval) === 'Approved').map(project => {
+                        const currentStageIndex = STAGES.indexOf(project.stage || 'Proposal Approved');
+                        return (
+                          <div key={project._id || project.id} className="p-3 border rounded-3 bg-white shadow-sm">
+                            <div className="d-flex justify-content-between align-items-center mb-4">
+                              <div>
+                                <h6 className="fw-bold mb-0">{project.title}</h6>
+                                <small className="text-muted">Student: {project.studentId?.name || 'N/A'}</small>
+                              </div>
+                              <Form.Select 
+                                size="sm" 
+                                className="w-auto fw-semibold border-primary text-primary bg-light"
+                                value={project.stage || 'Proposal Approved'}
+                                onChange={(e) => handleUpdateStage(project._id || project.id, e.target.value)}
+                              >
+                                {STAGES.map(stage => (
+                                  <option key={stage} value={stage}>{stage}</option>
+                                ))}
+                              </Form.Select>
+                            </div>
+                            
+                            <div className="position-relative mt-4 mb-2 mx-4">
+                              <div className="progress position-absolute w-100" style={{ height: '4px', top: '13px', zIndex: 0 }}>
+                                <div 
+                                  className="progress-bar bg-success transition-all" 
+                                  style={{ width: `${(Math.max(0, currentStageIndex) / (STAGES.length - 1)) * 100}%`, transition: 'width 0.5s ease-in-out' }}
+                                ></div>
+                              </div>
+                              <div className="d-flex justify-content-between position-relative" style={{ zIndex: 1 }}>
+                                {STAGES.map((stage, idx) => (
+                                  <div key={stage} className="d-flex flex-column align-items-center" style={{ width: '80px', marginLeft: idx === 0 ? '-40px' : '0', marginRight: idx === STAGES.length - 1 ? '-40px' : '0' }}>
+                                    <div 
+                                      className={`rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm ${idx <= currentStageIndex ? 'bg-success text-white' : 'bg-white text-muted border'}`}
+                                      style={{ width: '30px', height: '30px', fontSize: '12px', transition: 'all 0.3s ease' }}
+                                    >
+                                      {idx <= currentStageIndex ? '✓' : idx + 1}
+                                    </div>
+                                    <div className="text-center mt-2 text-wrap" style={{ fontSize: '0.75rem', lineHeight: '1.2', fontWeight: idx <= currentStageIndex ? '600' : 'normal', color: idx <= currentStageIndex ? '#198754' : '#6c757d' }}>
+                                      {stage}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </Card.Body>
+              </Card>
+
               <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
-                  <h5 className="fw-bold mb-4">📈 Student Progress Updates</h5>
+                  <h5 className="fw-bold mb-4">📅📅 Weekly Progress Updates</h5>
                   {progressUpdates.length === 0 ? (
                     <div className="text-center text-muted py-4">No progress updates yet</div>
                   ) : (

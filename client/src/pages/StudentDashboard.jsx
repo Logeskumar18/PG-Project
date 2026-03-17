@@ -3,6 +3,7 @@ import MyProfile from './MyProfile';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge } from 'react-bootstrap';
+import ProjectForm from '../components/ProjectForm.jsx';
 import api from '../services/api';
 import downloadPDF from '../utils/downloadPDF';
 import html2pdf from 'html2pdf.js'; // Ensure this import for Vite/React
@@ -12,8 +13,6 @@ const StudentDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
-  const [projectTitle, setProjectTitle] = useState('');
-  const [projectDescription, setProjectDescription] = useState('');
   const [showProjectModal, setShowProjectModal] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
@@ -21,6 +20,7 @@ const StudentDashboard = () => {
   const [documents, setDocuments] = useState([]);
   const [progressUpdates, setProgressUpdates] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
+  const [deadlines, setDeadlines] = useState([]);
   const [messages, setMessages] = useState([]);
   const [loadingAnnouncements, setLoadingAnnouncements] = useState(false);
   const [loadingMessages, setLoadingMessages] = useState(false);
@@ -54,6 +54,17 @@ const StudentDashboard = () => {
     } catch (error) {
       console.error('Error fetching announcements:', error);
       setLoadingAnnouncements(false);
+    }
+  };
+
+  const fetchDeadlines = async () => {
+    try {
+      const response = await api.get('/deadlines');
+      if (response.data.data) {
+        setDeadlines(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching deadlines:', error);
     }
   };
 
@@ -122,6 +133,7 @@ const StudentDashboard = () => {
   // Fetch announcements on mount
   useEffect(() => {
     fetchAnnouncements();
+    fetchDeadlines();
     fetchProject();
     fetchDocuments();
     fetchMessages();
@@ -137,32 +149,6 @@ const StudentDashboard = () => {
       fetchEvaluation();
     }
   }, [activeTab]);
-
-  const handleProjectSubmit = async (e) => {
-    e.preventDefault();
-    setErrorMessage('');
-    if (projectTitle.trim() && projectDescription.trim()) {
-      try {
-        const response = await api.post('/student/projects', {
-          title: projectTitle,
-          description: projectDescription
-        });
-        if (response.data && response.data.data) {
-          setSuccessMessage('Project title submitted successfully!');
-          setProjectTitle('');
-          setProjectDescription('');
-          setShowProjectModal(false);
-          await fetchProject(); // Refetch projects
-          setTimeout(() => setSuccessMessage(''), 3000);
-        } else {
-          setSuccessMessage('Project submitted, but no data returned.');
-        }
-      } catch (error) {
-        setErrorMessage(error.response?.data?.message || 'Error submitting project');
-        setTimeout(() => setErrorMessage(''), 5000);
-      }
-    }
-  };
 
   const handleDocumentUpload = async (e) => {
     e.preventDefault();
@@ -530,6 +516,29 @@ const StudentDashboard = () => {
               </Card>
             </Col>
 
+            {deadlines.length > 0 && (
+              <Col lg={12}>
+                <Card className="border-0 shadow-sm">
+                  <Card.Body className="p-4">
+                    <h5 className="fw-bold mb-4">⏰ Upcoming Global Deadlines</h5>
+                    <div className="d-flex flex-column gap-3">
+                      {deadlines.map(deadline => (
+                        <div key={deadline._id} className="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center border-start border-4 border-warning">
+                          <div>
+                            <h6 className="fw-bold mb-1">{deadline.title === 'Other' ? deadline.customTitle : deadline.title}</h6>
+                            <p className="text-muted mb-0 small">{deadline.description}</p>
+                          </div>
+                          <div className="text-end">
+                            <div className="fw-bold text-danger">{new Date(deadline.date).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            )}
+
             <Col lg={12}>
               <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
@@ -697,6 +706,13 @@ const StudentDashboard = () => {
                           {doc.comments && <small className="text-muted d-block mb-2">Comments: {doc.comments}</small>}
                           <small className="text-muted d-block">Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}</small>
                           {doc.remarks && <small className="d-block mt-2 text-dark"><strong>Staff Remarks:</strong> {doc.remarks}</small>}
+                          <div className="mt-2">
+                            {doc.cloudinaryUrl ? (
+                              <a href={doc.cloudinaryUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm me-2">Download</a>
+                            ) : (
+                              <a href={`/api/student/documents/${doc._id}/download`} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm me-2">Download</a>
+                            )}
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -1210,42 +1226,19 @@ const StudentDashboard = () => {
       {/* Project Modal */}
       <Modal show={showProjectModal} onHide={() => setShowProjectModal(false)} size="lg" centered>
         <Modal.Header closeButton>
-          <Modal.Title>Submit Project Title</Modal.Title>
+          <Modal.Title>{projects.length > 0 && projects[0].approvalStatus === 'Rejected' ? 'Resubmit Project' : 'Submit Project Title'}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form>
-            <Form.Group className="mb-3">
-              <Form.Label>Project Title *</Form.Label>
-              <Form.Control
-                value={projectTitle}
-                onChange={(e) => setProjectTitle(e.target.value)}
-                placeholder="Enter your project title"
-              />
-            </Form.Group>
-            <Form.Group className="mb-4">
-              <Form.Label>Project Description *</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={4}
-                value={projectDescription}
-                onChange={(e) => setProjectDescription(e.target.value)}
-                placeholder="Describe your project in detail"
-              />
-            </Form.Group>
-          </Form>
+          <ProjectForm 
+            project={projects.length > 0 && projects[0].approvalStatus === 'Rejected' ? projects[0] : null}
+            onSave={() => {
+              setShowProjectModal(false);
+              fetchProject();
+              setSuccessMessage('Project submitted successfully!');
+              setTimeout(() => setSuccessMessage(''), 3000);
+            }}
+          />
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowProjectModal(false)}>
-            Cancel
-          </Button>
-          <Button
-            className="fw-semibold text-white"
-            style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none' }}
-            onClick={handleProjectSubmit}
-          >
-            Submit Project
-          </Button>
-        </Modal.Footer>
       </Modal>
     </div>
   );

@@ -1,3 +1,24 @@
+// Download document by ID (redirect to Cloudinary URL)
+export const downloadDocument = async (req, res) => {
+  try {
+    const { documentId } = req.params;
+    const document = await Document.findById(documentId);
+    if (!document) {
+      return res.status(404).json({ message: 'Document not found' });
+    }
+    if (document.cloudinaryUrl) {
+      // Redirect to Cloudinary file
+      return res.redirect(document.cloudinaryUrl);
+    } else if (document.filePath) {
+      // Fallback: send local file if exists (legacy)
+      return res.download(document.filePath, document.fileName);
+    } else {
+      return res.status(404).json({ message: 'File not available' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: 'Error downloading document', error: error.message });
+  }
+};
 import Staff from '../models/Staff.js';
 import { sendMail } from '../utils/mailer.js';
 import { spawn } from 'child_process';
@@ -9,6 +30,8 @@ import Milestone from '../models/Milestone.js';
 import Progress from '../models/Progress.js';
 import multer from 'multer';
 import path from 'path';
+import cloudinary from '../config/cloudinary.js';
+import streamifier from 'streamifier';
 import { createNotification, notifyDocumentSubmission, notifyProgressSubmission } from '../utils/notificationService.js';
 import { fileURLToPath } from 'url';
 
@@ -31,9 +54,17 @@ const checkSimilarity = (newTitle, existingTitles) => {
         resolve({ score: 0 }); // Fail safe
       } else {
         try {
-          resolve(JSON.parse(result));
+          const response = JSON.parse(result);
+          if (response.top_matches && response.top_matches.length > 0) {
+            resolve({
+              score: response.top_matches[0].score,
+              most_similar: response.top_matches[0].title
+            });
+          } else {
+            resolve({ score: 0, most_similar: '' });
+          }
         } catch (e) {
-          resolve({ score: 0 });
+          resolve({ score: 0, most_similar: '' });
         }
       }
     });
@@ -111,18 +142,9 @@ export const updateMyProject = async (req, res) => {
   }
 };
 
-// Configure multer for file uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, 'uploads/'); // Make sure this directory exists
-  },
-  filename: (req, file, cb) => {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
-  }
-});
-
-const upload = multer({
+// Configure multer for file uploads (memory storage for Cloudinary)
+const storage = multer.memoryStorage();
+export const upload = multer({
   storage: storage,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
@@ -131,7 +153,6 @@ const upload = multer({
     const allowedTypes = /pdf|doc|docx|ppt|pptx|zip|rar|txt|jpg|jpeg|png/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
-
     if (mimetype && extname) {
       return cb(null, true);
     } else {
@@ -257,6 +278,7 @@ export const getMyProject = async (req, res) => {
 // Student uploads a document for their project
 export const uploadDocument = async (req, res) => {
   try {
+
     const userId = req.user._id;
     const { docType, comments } = req.body;
     const file = req.file;
@@ -278,12 +300,39 @@ export const uploadDocument = async (req, res) => {
       return res.status(404).json({ message: 'No project found. Please submit a project first.' });
     }
 
+    // Upload file to Cloudinary
+    let cloudinaryResult;
+    try {
+      cloudinaryResult = await new Promise((resolve, reject) => {
+        const uploadStream = cloudinary.uploader.upload_stream(
+          {
+            resource_type: 'raw', // 'raw' is required for files like .docx, .zip, .pdf
+            folder: 'pg-project-documents',
+            public_id: `${project._id}_${Date.now()}_${file.originalname}`
+          },
+          (error, result) => {
+            if (error) {
+              console.error('Cloudinary Stream Error:', error);
+              return reject(error);
+            }
+            resolve(result);
+          }
+        );
+        streamifier.createReadStream(file.buffer).pipe(uploadStream);
+      });
+    } catch (err) {
+      console.error('Cloudinary Upload Exception:', err);
+      return res.status(500).json({ message: 'Cloudinary upload failed', error: err.message || JSON.stringify(err) });
+    }
+
     const document = await Document.create({
       projectId: project._id,
       studentId: student._id,
       type: docType,
       fileName: file.originalname,
-      filePath: file.path,
+      filePath: cloudinaryResult.secure_url,
+      cloudinaryUrl: cloudinaryResult.secure_url,
+      cloudinaryPublicId: cloudinaryResult.public_id,
       comments: comments || ''
     });
 

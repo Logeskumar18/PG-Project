@@ -47,6 +47,12 @@ const projectSchema = new mongoose.Schema(
       default: 'Submitted'
     },
 
+    stage: {
+      type: String,
+      enum: ['Proposal Submitted', 'Proposal Approved', 'Development', 'Mid Review', 'Testing', 'Final Submission'],
+      default: 'Proposal Submitted'
+    },
+
     // Approval workflow
     approvalStatus: {
       type: String,

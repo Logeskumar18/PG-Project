@@ -9,6 +9,8 @@ import teamRoutes from './routes/teamRoutes.js';
 import communicationRoutes from './routes/communicationRoutes.js';
 import studentRoutes from './routes/studentRoutes.js';
 import marksRoutes from './routes/marks.js';
+import activityRoutes from './routes/activityRoutes.js';
+import deadlineRoutes from './routes/deadlineRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -38,6 +40,8 @@ app.use('/api/teams', teamRoutes);
 app.use('/api/communication', communicationRoutes);
 app.use('/api/student', studentRoutes);
 app.use('/api/marks', marksRoutes);
+app.use('/api/activities', activityRoutes);
+app.use('/api/deadlines', deadlineRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

@@ -26,6 +26,12 @@ const documentSchema = new mongoose.Schema(
       type: String,
       required: true
     },
+    cloudinaryUrl: {
+      type: String,
+    },
+    cloudinaryPublicId: {
+      type: String,
+    },
     comments: {
       type: String
     },

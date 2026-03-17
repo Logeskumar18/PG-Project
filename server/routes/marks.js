@@ -3,6 +3,7 @@ import Mark from '../models/Mark.js';
 
 import Project from '../models/Project.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
+import { logActivity } from '../utils/logger.js';
 
 const router = express.Router();
 
@@ -15,6 +16,7 @@ router.post("/assign-marks", protect, authorize('Staff'), async (req, res) => {
       titleMarks,
       progressMarks,
       documentMarks,
+      
       interactionMarks,
       finalReviewMarks,
       remarks
@@ -56,6 +58,16 @@ router.post("/assign-marks", protect, authorize('Staff'), async (req, res) => {
       status: status === 'Approved' ? 'Completed' : 'In Progress',
       approvalStatus: status === 'Approved' ? 'Approved' : 'Pending',
       approvalRemarks: `Marks: ${totalMarks}/40. ${remarks}`
+    });
+    
+    // Log the activity
+    await logActivity({
+      userId: req.user._id,
+      userModel: req.user.role || 'Staff',
+      action: 'UPDATED',
+      resource: 'Marks',
+      resourceId: marks._id,
+      details: { studentId, projectId, totalMarks }
     });
 
     res.json({ success: true, data: marks });

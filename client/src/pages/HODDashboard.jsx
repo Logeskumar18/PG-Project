@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge, Table, ProgressBar, Spinner } from 'react-bootstrap';
 import api from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import ActivityLog from '../components/ActivityLog.jsx';
 
 const HODDashboard = () => {
     // Validation helpers
@@ -58,6 +59,7 @@ const HODDashboard = () => {
   const [students, setStudents] = useState([]);
   const [announcements, setAnnouncements] = useState([]);
   const [evaluations, setEvaluations] = useState([]);
+  const [deadlines, setDeadlines] = useState([]);
 
   // Fetch data from API
   useEffect(() => {
@@ -101,6 +103,12 @@ const HODDashboard = () => {
           setEvaluations(evaluationsRes.data.data);
         }
 
+        // Fetch deadlines
+        const deadlinesRes = await api.get('/deadlines');
+        if (deadlinesRes.data.data) {
+          setDeadlines(deadlinesRes.data.data);
+        }
+
         setLoading(false);
         setInitialLoading(false);
       } catch (error) {
@@ -118,6 +126,13 @@ const HODDashboard = () => {
 
   const [showApprovalModal, setShowApprovalModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showDeadlineModal, setShowDeadlineModal] = useState(false);
+  const [deadlineForm, setDeadlineForm] = useState({
+    title: 'Proposal Deadline',
+    customTitle: '',
+    date: '',
+    description: ''
+  });
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
   const [showCreateStaffModal, setShowCreateStaffModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -191,6 +206,38 @@ const HODDashboard = () => {
       } finally {
         setLoading(false);
       }
+    }
+  };
+
+  const handleCreateDeadline = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await api.post('/deadlines', deadlineForm);
+      if (response.data.success) {
+        setSuccessMessage('Deadline created successfully!');
+        setShowDeadlineModal(false);
+        setDeadlines([...deadlines, response.data.data].sort((a, b) => new Date(a.date) - new Date(b.date)));
+        setDeadlineForm({ title: 'Proposal Deadline', customTitle: '', date: '', description: '' });
+        setTimeout(() => setSuccessMessage(''), 3000);
+      }
+    } catch (error) {
+      setErrorMessage(error.response?.data?.message || 'Error creating deadline');
+      setTimeout(() => setErrorMessage(''), 3000);
+    }
+  };
+
+  const handleDeleteDeadline = async (id) => {
+    if (!window.confirm('Are you sure you want to delete this deadline?')) return;
+    try {
+      const response = await api.delete(`/deadlines/${id}`);
+      if (response.data.success) {
+        setDeadlines(deadlines.filter(d => d._id !== id));
+        setSuccessMessage('Deadline deleted successfully!');
+        setTimeout(() => setSuccessMessage(''), 3000);
+      }
+    } catch (error) {
+      setErrorMessage('Error deleting deadline');
+      setTimeout(() => setErrorMessage(''), 3000);
     }
   };
 
@@ -410,6 +457,13 @@ const HODDashboard = () => {
             📢 Announcements
           </Button>
           <Button
+            variant={activeTab === 'deadlines' ? 'primary' : 'light'}
+            onClick={() => setActiveTab('deadlines')}
+            className="fw-semibold"
+          >
+            ⏰ Deadlines
+          </Button>
+          <Button
             variant={activeTab === 'evaluations' ? 'primary' : 'light'}
             onClick={() => setActiveTab('evaluations')}
             className="fw-semibold"
@@ -422,6 +476,13 @@ const HODDashboard = () => {
             className="fw-semibold"
           >
             📈 Analytics
+          </Button>
+          <Button
+            variant={activeTab === 'activity' ? 'primary' : 'light'}
+            onClick={() => setActiveTab('activity')}
+            className="fw-semibold"
+          >
+            🕒 Activity Log
           </Button>
         </div>
 
@@ -706,6 +767,49 @@ const HODDashboard = () => {
           </Row>
         )}
 
+        {/* Deadlines Tab */}
+        {activeTab === 'deadlines' && (
+          <Row className="g-4">
+            <Col lg={12}>
+              <Card className="border-0 shadow-sm">
+                <Card.Body className="p-4">
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h5 className="fw-bold mb-0">⏰ Project Deadlines & Milestones</h5>
+                    <Button variant="primary" onClick={() => setShowDeadlineModal(true)}>
+                      + Set New Deadline
+                    </Button>
+                  </div>
+                  {deadlines.length === 0 ? (
+                    <div className="text-center text-muted py-4">No deadlines configured</div>
+                  ) : (
+                    <div className="d-flex flex-column gap-3">
+                      {deadlines.map(deadline => (
+                        <div key={deadline._id} className="p-3 border rounded-3 d-flex justify-content-between align-items-center border-start border-4 border-warning bg-white shadow-sm">
+                          <div>
+                            <h6 className="fw-bold mb-1">{deadline.title === 'Other' ? deadline.customTitle : deadline.title}</h6>
+                            <p className="text-muted mb-0 small">{deadline.description}</p>
+                          </div>
+                          <div className="text-end d-flex align-items-center gap-4">
+                            <div>
+                              <div className="fw-bold text-danger fs-5">{new Date(deadline.date).toLocaleDateString()}</div>
+                              <small className="text-muted">
+                                {Math.ceil((new Date(deadline.date) - new Date()) / (1000 * 60 * 60 * 24))} days left
+                              </small>
+                            </div>
+                            <Button variant="outline-danger" size="sm" onClick={() => handleDeleteDeadline(deadline._id)}>
+                              🗑️
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        )}
+
         {/* Evaluations Tab */}
         {activeTab === 'evaluations' && (
           <Row className="g-4">
@@ -836,6 +940,15 @@ const HODDashboard = () => {
             </Col>
           </Row>
         )}
+
+        {/* Activity Log Tab */}
+        {activeTab === 'activity' && (
+          <Row className="g-4">
+            <Col lg={12}>
+              <ActivityLog />
+            </Col>
+          </Row>
+        )}
       </Container>
 
       {/* Modals */}
@@ -898,6 +1011,53 @@ const HODDashboard = () => {
               </Button>
               <Button variant="primary" type="submit">
                 Assign Guide
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* Deadline Modal */}
+      <Modal show={showDeadlineModal} onHide={() => setShowDeadlineModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Set New Deadline</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleCreateDeadline}>
+            <Form.Group className="mb-3">
+              <Form.Label>Deadline Type</Form.Label>
+              <Form.Select 
+                value={deadlineForm.title} 
+                onChange={(e) => setDeadlineForm({...deadlineForm, title: e.target.value})}
+                required
+              >
+                <option value="Proposal Deadline">Proposal Deadline</option>
+                <option value="Progress Review 1">Progress Review 1</option>
+                <option value="Progress Review 2">Progress Review 2</option>
+                <option value="Final Submission">Final Submission</option>
+                <option value="Other">Other (Specify)</option>
+              </Form.Select>
+            </Form.Group>
+            {deadlineForm.title === 'Other' && (
+              <Form.Group className="mb-3">
+                <Form.Label>Custom Title</Form.Label>
+                <Form.Control type="text" placeholder="Enter title" value={deadlineForm.customTitle} onChange={(e) => setDeadlineForm({...deadlineForm, customTitle: e.target.value})} required />
+              </Form.Group>
+            )}
+            <Form.Group className="mb-3">
+              <Form.Label>Date</Form.Label>
+              <Form.Control type="date" value={deadlineForm.date} onChange={(e) => setDeadlineForm({...deadlineForm, date: e.target.value})} required />
+            </Form.Group>
+            <Form.Group className="mb-4">
+              <Form.Label>Description (Optional)</Form.Label>
+              <Form.Control as="textarea" rows={3} placeholder="Add instructions or details" value={deadlineForm.description} onChange={(e) => setDeadlineForm({...deadlineForm, description: e.target.value})} />
+            </Form.Group>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="secondary" onClick={() => setShowDeadlineModal(false)}>
+                Cancel
+              </Button>
+              <Button variant="primary" type="submit">
+                Set Deadline
               </Button>
             </div>
           </Form>
