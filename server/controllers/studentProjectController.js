@@ -1,4 +1,4 @@
-// Download document by ID (redirect to Cloudinary URL)
+// Download document by ID
 export const downloadDocument = async (req, res) => {
   try {
     const { documentId } = req.params;
@@ -6,12 +6,12 @@ export const downloadDocument = async (req, res) => {
     if (!document) {
       return res.status(404).json({ message: 'Document not found' });
     }
-    if (document.cloudinaryUrl) {
-      // Redirect to Cloudinary file
-      return res.redirect(document.cloudinaryUrl);
-    } else if (document.filePath) {
-      // Fallback: send local file if exists (legacy)
-      return res.download(document.filePath, document.fileName);
+    if (document.filePath) {
+      if (document.filePath.startsWith('http')) {
+        return res.redirect(document.filePath);
+      }
+      // Use absolute path for download to prevent relative directory issues
+      return res.download(path.resolve(document.filePath), document.fileName);
     } else {
       return res.status(404).json({ message: 'File not available' });
     }
@@ -30,10 +30,9 @@ import Milestone from '../models/Milestone.js';
 import Progress from '../models/Progress.js';
 import multer from 'multer';
 import path from 'path';
-import cloudinary from '../config/cloudinary.js';
-import streamifier from 'streamifier';
 import { createNotification, notifyDocumentSubmission, notifyProgressSubmission } from '../utils/notificationService.js';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -142,8 +141,19 @@ export const updateMyProject = async (req, res) => {
   }
 };
 
-// Configure multer for file uploads (memory storage for Cloudinary)
-const storage = multer.memoryStorage();
+// Configure multer for file uploads (local disk storage)
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = 'uploads/documents/';
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, `${Date.now()}_${file.originalname}`);
+  }
+});
 export const upload = multer({
   storage: storage,
   limits: {
@@ -300,39 +310,12 @@ export const uploadDocument = async (req, res) => {
       return res.status(404).json({ message: 'No project found. Please submit a project first.' });
     }
 
-    // Upload file to Cloudinary
-    let cloudinaryResult;
-    try {
-      cloudinaryResult = await new Promise((resolve, reject) => {
-        const uploadStream = cloudinary.uploader.upload_stream(
-          {
-            resource_type: 'raw', // 'raw' is required for files like .docx, .zip, .pdf
-            folder: 'pg-project-documents',
-            public_id: `${project._id}_${Date.now()}_${file.originalname}`
-          },
-          (error, result) => {
-            if (error) {
-              console.error('Cloudinary Stream Error:', error);
-              return reject(error);
-            }
-            resolve(result);
-          }
-        );
-        streamifier.createReadStream(file.buffer).pipe(uploadStream);
-      });
-    } catch (err) {
-      console.error('Cloudinary Upload Exception:', err);
-      return res.status(500).json({ message: 'Cloudinary upload failed', error: err.message || JSON.stringify(err) });
-    }
-
     const document = await Document.create({
       projectId: project._id,
       studentId: student._id,
       type: docType,
       fileName: file.originalname,
-      filePath: cloudinaryResult.secure_url,
-      cloudinaryUrl: cloudinaryResult.secure_url,
-      cloudinaryPublicId: cloudinaryResult.public_id,
+      filePath: file.path,
       comments: comments || ''
     });
 

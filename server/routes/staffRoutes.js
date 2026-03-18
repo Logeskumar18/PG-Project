@@ -18,8 +18,9 @@ const isStaff = (req, res, next) => {
 };
 
 const router = express.Router();
-// Staff download document by ID (must be after router is initialized)
-router.get('/documents/:documentId/download', protect, isStaff, staffDownloadDocument);
+
+// Document download by ID (publicly accessible via unguessable document ID since <a> tags can't send auth headers)
+router.get('/documents/:documentId/download', staffDownloadDocument);
 
 /* ============================
    DASHBOARD

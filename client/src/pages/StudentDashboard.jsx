@@ -721,8 +721,8 @@ const StudentDashboard = () => {
                           <small className="text-muted d-block">Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}</small>
                           {doc.remarks && <small className="d-block mt-2 text-dark"><strong>Staff Remarks:</strong> {doc.remarks}</small>}
                           <div className="mt-2">
-                            {(doc.cloudinaryUrl || doc.fileUrl || doc.url) ? (
-                              <a href={doc.cloudinaryUrl || doc.fileUrl || doc.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm me-2">Download</a>
+                            {(doc.fileUrl || doc.url) ? (
+                              <a href={doc.fileUrl || doc.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm me-2">Download</a>
                             ) : (
                               <a href={api.defaults?.baseURL ? `${api.defaults.baseURL.replace(/\/$/, '')}/student/documents/${doc._id}/download` : `/api/student/documents/${doc._id}/download`} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm me-2">Download</a>
                             )}
