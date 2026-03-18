@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import ConfirmLogoutModal from '../components/ConfirmLogoutModal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge, Table } from 'react-bootstrap';
@@ -373,9 +374,17 @@ const StaffDashboard = () => {
     setShowStudentProfileModal(true);
   };
 
-  const handleLogout = () => {
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const handleLogoutClick = () => {
+    setShowLogoutModal(true);
+  };
+  const handleConfirmLogout = () => {
+    setShowLogoutModal(false);
     logout();
     navigate('/login/staff');
+  };
+  const handleCancelLogout = () => {
+    setShowLogoutModal(false);
   };
 
   const pendingCount = projects.filter(p => (p.approvalStatus || p.approval) === 'Pending').length;
@@ -392,7 +401,12 @@ const StaffDashboard = () => {
               <h4 className="fw-bold mb-0" style={{ color: '#4facfe' }}>👨‍🏫 Staff Dashboard</h4>
               <small className="text-muted">Welcome, {user?.name}</small>
             </div>
-            <Button variant="danger" size="sm" onClick={handleLogout}>Logout</Button>
+            <Button variant="danger" size="sm" onClick={handleLogoutClick}>Logout</Button>
+                <ConfirmLogoutModal
+                  show={showLogoutModal}
+                  onConfirm={handleConfirmLogout}
+                  onCancel={handleCancelLogout}
+                />
           </div>
         </Container>
       </div>
@@ -794,12 +808,12 @@ const StaffDashboard = () => {
                           <td className="text-muted small" style={{maxWidth: '250px', whiteSpace: 'normal'}}>{doc.remarks || '—'}</td>
                           <td>{doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : '—'}</td>
                           <td>
-                            {doc.cloudinaryUrl ? (
+                            {(doc.cloudinaryUrl || doc.fileUrl || doc.url) ? (
                               <Button
                                 variant="outline-success"
                                 size="sm"
                                 className="me-2"
-                                onClick={() => window.open(doc.cloudinaryUrl, '_blank')}
+                                onClick={() => window.open(doc.cloudinaryUrl || doc.fileUrl || doc.url, '_blank')}
                               >
                                 View
                               </Button>
@@ -808,7 +822,7 @@ const StaffDashboard = () => {
                                 variant="outline-success"
                                 size="sm"
                                 className="me-2"
-                                onClick={() => window.open(`/api/staff/documents/${doc._id || doc.id}/download`, '_blank')}
+                                onClick={() => window.open(api.defaults?.baseURL ? `${api.defaults.baseURL.replace(/\/$/, '')}/staff/documents/${doc._id || doc.id}/download` : `/api/staff/documents/${doc._id || doc.id}/download`, '_blank')}
                               >
                                 View
                               </Button>

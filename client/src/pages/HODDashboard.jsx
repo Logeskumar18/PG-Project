@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import ConfirmLogoutModal from '../components/ConfirmLogoutModal';
 import { DEPARTMENTS } from '../constants/departments';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -60,6 +61,17 @@ const HODDashboard = () => {
   const [announcements, setAnnouncements] = useState([]);
   const [evaluations, setEvaluations] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
+
+  // Search filter state and logic for All Projects
+  const [searchProject, setSearchProject] = useState('');
+  const filteredProjects = projects.filter(project => {
+    const search = searchProject.toLowerCase();
+    return (
+      project.title?.toLowerCase().includes(search) ||
+      project.studentId?.name?.toLowerCase().includes(search) ||
+      project.assignedGuideId?.name?.toLowerCase().includes(search)
+    );
+  });
 
   // Fetch data from API
   useEffect(() => {
@@ -322,9 +334,17 @@ const HODDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const handleLogoutClick = () => {
+    setShowLogoutModal(true);
+  };
+  const handleConfirmLogout = () => {
+    setShowLogoutModal(false);
     logout();
     navigate('/login/hod');
+  };
+  const handleCancelLogout = () => {
+    setShowLogoutModal(false);
   };
 
   // Calculate Marks Analytics
@@ -402,7 +422,12 @@ const HODDashboard = () => {
               <h4 className="fw-bold mb-0" style={{ color: '#f093fb' }}>👨‍💼 HOD Dashboard</h4>
               <small className="text-muted">Welcome, {user?.name}</small>
             </div>
-            <Button variant="danger" size="sm" onClick={handleLogout}>Logout</Button>
+            <Button variant="danger" size="sm" onClick={handleLogoutClick}>Logout</Button>
+                <ConfirmLogoutModal
+                  show={showLogoutModal}
+                  onConfirm={handleConfirmLogout}
+                  onCancel={handleCancelLogout}
+                />
           </div>
         </Container>
       </div>
@@ -568,7 +593,8 @@ const HODDashboard = () => {
                                 {project.approvalStatus}
                               </Badge>
                             </td>
-                            <td>{project.submissionDate ? new Date(project.submissionDate).toLocaleDateString() : (project.submittedAt ? new Date(project.submittedAt).toLocaleDateนString() : (project.createdAt ? new Date(project.createdAt).toLocaleDateString() : '—'))}</td>
+                            <td>{project.submissionDate ? new Date(project.submissionDate).toLocaleDateString() : (project.submittedAt ? new Date(project.submittedAt).toLocaleDateString() : (project.createdAt ? new Date(project.createdAt).toLocaleDateString() : '—'))}</td>
+
                             {/* <td>
                               {!project.assignedGuideId && (
                                 <Button
@@ -600,11 +626,22 @@ const HODDashboard = () => {
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <h5 className="fw-bold mb-0">📋 All Projects</h5>
                   </div>
+                  {/* Search Filter */}
+                  <div className="mb-3">
+                    <input
+                      type="text"
+                      className="form-control"
+                      placeholder="Search projects by title, student, or guide..."
+                      value={searchProject || ''}
+                      onChange={e => setSearchProject(e.target.value)}
+                      style={{ maxWidth: 400 }}
+                    />
+                  </div>
                   <div className="d-flex flex-column gap-3">
-                    {projects.length === 0 ? (
+                    {filteredProjects.length === 0 ? (
                       <div className="text-center text-muted py-4">No projects found</div>
                     ) : (
-                      projects.map(project => (
+                      filteredProjects.map(project => (
                         <div key={project._id} className="p-3 border rounded-3">
                           <div className="d-flex justify-content-between align-items-start mb-2">
                             <div className="flex-grow-1">
@@ -633,6 +670,8 @@ const HODDashboard = () => {
             </Col>
           </Row>
         )}
+
+
 
         {/* Staff Tab */}
         {activeTab === 'staff' && (
@@ -1221,3 +1260,4 @@ const HODDashboard = () => {
 };
 
 export default HODDashboard;
+

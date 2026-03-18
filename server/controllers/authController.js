@@ -203,6 +203,16 @@ export const login = async (req, res) => {
 
     // Send Login Notification
     await notifyLogin(user, req);
+    
+    // Log activity
+    const { logActivity } = await import('../utils/logger.js');
+    await logActivity({
+      userId: user._id,
+      userModel: user.constructor.modelName, // 'Student', 'Staff', 'HOD'
+      action: 'LOGIN',
+      resource: 'Auth',
+      details: { ip: req.ip, userAgent: req.get('User-Agent') }
+    });
 
     res.status(200).json({
       status: 'success',
@@ -222,6 +232,7 @@ export const login = async (req, res) => {
         token
       }
     });
+
   } catch (error) {
     console.error('Login error:', error);
     res.status(500).json({

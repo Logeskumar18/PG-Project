@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import ConfirmLogoutModal from '../components/ConfirmLogoutModal';
 import MyProfile from './MyProfile';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -329,9 +330,17 @@ const StudentDashboard = () => {
     }
   };
 
-  const handleLogout = () => {
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const handleLogoutClick = () => {
+    setShowLogoutModal(true);
+  };
+  const handleConfirmLogout = () => {
+    setShowLogoutModal(false);
     logout();
     navigate('/login/student');
+  };
+  const handleCancelLogout = () => {
+    setShowLogoutModal(false);
   };
 
   return (
@@ -365,7 +374,12 @@ const StudentDashboard = () => {
               <h4 className="fw-bold mb-0" style={{ color: '#667eea' }}>📚 Student Dashboard</h4>
               <small className="text-muted">Welcome, {user?.name}</small>
             </div>
-            <Button variant="danger" size="sm" onClick={handleLogout}>Logout</Button>
+            <Button variant="danger" size="sm" onClick={handleLogoutClick}>Logout</Button>
+                <ConfirmLogoutModal
+                  show={showLogoutModal}
+                  onConfirm={handleConfirmLogout}
+                  onCancel={handleCancelLogout}
+                />
           </div>
         </Container>
       </div>
@@ -707,10 +721,10 @@ const StudentDashboard = () => {
                           <small className="text-muted d-block">Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}</small>
                           {doc.remarks && <small className="d-block mt-2 text-dark"><strong>Staff Remarks:</strong> {doc.remarks}</small>}
                           <div className="mt-2">
-                            {doc.cloudinaryUrl ? (
-                              <a href={doc.cloudinaryUrl} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm me-2">Download</a>
+                            {(doc.cloudinaryUrl || doc.fileUrl || doc.url) ? (
+                              <a href={doc.cloudinaryUrl || doc.fileUrl || doc.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm me-2">Download</a>
                             ) : (
-                              <a href={`/api/student/documents/${doc._id}/download`} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm me-2">Download</a>
+                              <a href={api.defaults?.baseURL ? `${api.defaults.baseURL.replace(/\/$/, '')}/student/documents/${doc._id}/download` : `/api/student/documents/${doc._id}/download`} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm me-2">Download</a>
                             )}
                           </div>
                         </div>
