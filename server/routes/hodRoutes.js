@@ -35,7 +35,9 @@ router.post('/projects/:projectId/assign-guide', protect, isHOD, hodController.a
 // Staff and Students
 router.get('/staff', protect, isHOD, hodController.getAllStaff);
 router.post('/staff', protect, isHOD, hodController.createStaff);
+router.delete('/staff/:id', protect, isHOD, hodController.deleteStaff);
 router.get('/students', protect, isHOD, hodController.getAllStudents);
+router.delete('/students/:id', protect, isHOD, hodController.deleteStudent);
 
 // Announcements
 router.post('/announcements', protect, isHOD, hodController.createAnnouncement);

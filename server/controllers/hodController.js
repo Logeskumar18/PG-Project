@@ -280,6 +280,31 @@ export const getAllStaff = async (req, res) => {
   }
 };
 
+// Delete a staff member
+export const deleteStaff = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const staff = await Staff.findByIdAndDelete(id);
+
+    if (!staff) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Staff member not found'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      message: 'Staff member deleted successfully'
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
 // Get all students
 export const getAllStudents = async (req, res) => {
   try {
@@ -302,6 +327,31 @@ export const getAllStudents = async (req, res) => {
     res.json({
       status: 'success',
       data: studentsWithProjects
+    });
+  } catch (error) {
+    res.status(500).json({
+      status: 'error',
+      message: error.message
+    });
+  }
+};
+
+// Delete a student
+export const deleteStudent = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const student = await Student.findByIdAndDelete(id);
+
+    if (!student) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Student not found'
+      });
+    }
+
+    res.json({
+      status: 'success',
+      message: 'Student deleted successfully'
     });
   } catch (error) {
     res.status(500).json({

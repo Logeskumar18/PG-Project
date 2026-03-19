@@ -145,10 +145,23 @@ const HODDashboard = () => {
     date: '',
     description: ''
   });
+  const [editingDeadline, setEditingDeadline] = useState(null);
   const [showAnnouncementModal, setShowAnnouncementModal] = useState(false);
+  const [editingAnnouncement, setEditingAnnouncement] = useState(null);
   const [showCreateStaffModal, setShowCreateStaffModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState(null);
   const [approvalRemarks, setApprovalRemarks] = useState('');
+
+  const [showProfileModal, setShowProfileModal] = useState(false);
+  const [selectedProfileUser, setSelectedProfileUser] = useState(null);
+
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteInfo, setDeleteInfo] = useState({ id: null, type: '' });
+
+  const handleViewProfile = (user, type) => {
+    setSelectedProfileUser({ ...user, profileType: type });
+    setShowProfileModal(true);
+  };
 
   const handleApproveFinal = (project) => {
     setSelectedProject(project);
@@ -221,55 +234,124 @@ const HODDashboard = () => {
     }
   };
 
-  const handleCreateDeadline = async (e) => {
+  const handleDeleteStaff = (id) => {
+    setDeleteInfo({ id, type: 'staff' });
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteStudent = (id) => {
+    setDeleteInfo({ id, type: 'student' });
+    setShowDeleteModal(true);
+  };
+
+  const handleDeleteAnnouncement = (id) => {
+    setDeleteInfo({ id, type: 'announcement' });
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    const { id, type } = deleteInfo;
+    setShowDeleteModal(false);
+    if (!id) return;
+
+    try {
+      setLoading(true);
+      if (type === 'staff') {
+        const response = await api.delete(`/hod/staff/${id}`);
+        if (response.data.status === 'success' || response.data.success) {
+          setStaff(staff.filter(s => s._id !== id));
+          setSuccessMessage('Staff member deleted successfully!');
+        }
+      } else if (type === 'student') {
+        const response = await api.delete(`/hod/students/${id}`);
+        if (response.data.status === 'success' || response.data.success) {
+          setStudents(students.filter(s => s._id !== id));
+          setSuccessMessage('Student deleted successfully!');
+        }
+      } else if (type === 'deadline') {
+        const response = await api.delete(`/deadlines/${id}`);
+        if (response.data.success || response.data.status === 'success') {
+          setDeadlines(deadlines.filter(d => d._id !== id));
+          setSuccessMessage('Deadline deleted successfully!');
+        }
+      } else if (type === 'announcement') {
+        const response = await api.delete(`/hod/announcements/${id}`);
+        if (response.data.status === 'success' || response.data.success) {
+          setAnnouncements(announcements.filter(a => a._id !== id && a.id !== id));
+          setSuccessMessage('Announcement deleted successfully!');
+        }
+      }
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      console.error(`Error deleting ${type}:`, error);
+      setErrorMessage(error.response?.data?.message || `Failed to delete ${type === 'staff' ? 'staff member' : type}`);
+      setTimeout(() => setErrorMessage(''), 3000);
+    } finally {
+      setLoading(false);
+      setDeleteInfo({ id: null, type: '' });
+    }
+  };
+
+  const handleSubmitDeadline = async (e) => {
     e.preventDefault();
     try {
-      const response = await api.post('/deadlines', deadlineForm);
-      if (response.data.success) {
-        setSuccessMessage('Deadline created successfully!');
+      let response;
+      if (editingDeadline) {
+        response = await api.put(`/deadlines/${editingDeadline._id}`, deadlineForm);
+      } else {
+        response = await api.post('/deadlines', deadlineForm);
+      }
+      
+      if (response.data.success || response.data.status === 'success') {
+        setSuccessMessage(`Deadline ${editingDeadline ? 'updated' : 'created'} successfully!`);
         setShowDeadlineModal(false);
-        setDeadlines([...deadlines, response.data.data].sort((a, b) => new Date(a.date) - new Date(b.date)));
+        setEditingDeadline(null);
+        
+        // Refresh deadlines
+        const deadlinesRes = await api.get('/deadlines');
+        if (deadlinesRes.data?.data) {
+          setDeadlines(deadlinesRes.data.data);
+        }
+        
         setDeadlineForm({ title: 'Proposal Deadline', customTitle: '', date: '', description: '' });
         setTimeout(() => setSuccessMessage(''), 3000);
       }
     } catch (error) {
-      setErrorMessage(error.response?.data?.message || 'Error creating deadline');
+      setErrorMessage(error.response?.data?.message || `Error ${editingDeadline ? 'updating' : 'creating'} deadline`);
       setTimeout(() => setErrorMessage(''), 3000);
     }
   };
 
-  const handleDeleteDeadline = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this deadline?')) return;
-    try {
-      const response = await api.delete(`/deadlines/${id}`);
-      if (response.data.success) {
-        setDeadlines(deadlines.filter(d => d._id !== id));
-        setSuccessMessage('Deadline deleted successfully!');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      }
-    } catch (error) {
-      setErrorMessage('Error deleting deadline');
-      setTimeout(() => setErrorMessage(''), 3000);
-    }
+  const handleDeleteDeadline = (id) => {
+    setDeleteInfo({ id, type: 'deadline' });
+    setShowDeleteModal(true);
   };
 
-  const handleCreateAnnouncement = async (e) => {
+  const handleSubmitAnnouncement = async (e) => {
     e.preventDefault();
     const formData = new FormData(e.target);
     try {
       setErrorMessage('');
-      const response = await api.post('/hod/announcements', {
+      const payload = {
         title: formData.get('title'),
         message: formData.get('message'),
         type: formData.get('type'),
         targetAudience: formData.get('targetAudience')
-      });
+      };
+
+      let response;
+      if (editingAnnouncement) {
+        response = await api.put(`/hod/announcements/${editingAnnouncement._id || editingAnnouncement.id}`, payload);
+      } else {
+        response = await api.post('/hod/announcements', payload);
+      }
 
       console.log('Announcement response:', response);
 
       if (response.data.status === 'success') {
-        setSuccessMessage('Announcement posted successfully!');
+        setSuccessMessage(`Announcement ${editingAnnouncement ? 'updated' : 'posted'} successfully!`);
         setShowAnnouncementModal(false);
+        setEditingAnnouncement(null);
         e.target.reset();
         // Refresh announcements
         const announcementsRes = await api.get('/hod/announcements');
@@ -280,7 +362,7 @@ const HODDashboard = () => {
       }
     } catch (error) {
       console.error('Error creating announcement:', error);
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to create announcement';
+      const errorMsg = error.response?.data?.message || error.message || `Failed to ${editingAnnouncement ? 'update' : 'create'} announcement`;
       setErrorMessage(errorMsg);
       setTimeout(() => setErrorMessage(''), 5000);
     }
@@ -700,7 +782,7 @@ const HODDashboard = () => {
                           <th>Employee ID</th>
                           <th>Email</th>
                           <th>Department</th>
-                          <th>Status</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -710,7 +792,14 @@ const HODDashboard = () => {
                             <td>{member.employeeId}</td>
                             <td>{member.email}</td>
                             <td>{member.department || 'N/A'}</td>
-                            <td><Badge bg={member.isActive ? 'success' : 'danger'}>{member.isActive ? 'Active' : 'Inactive'}</Badge></td>
+                            <td className="d-flex gap-2">
+                              <Button variant="outline-info" size="sm" onClick={() => handleViewProfile(member, 'staff')}>
+                                View Profile
+                              </Button>
+                              <Button variant="outline-danger" size="sm" onClick={() => handleDeleteStaff(member._id)}>
+                                Delete
+                              </Button>
+                            </td>
                           </tr>
                         ))}
                       </tbody>
@@ -741,7 +830,7 @@ const HODDashboard = () => {
                           <th>Student ID</th>
                           <th>Email</th>
                           <th>Department</th>
-                          <th>Status</th>
+                          <th>Actions</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -751,10 +840,13 @@ const HODDashboard = () => {
                             <td>{student.studentId}</td>
                             <td>{student.email}</td>
                             <td>{student.department || 'N/A'}</td>
-                            <td>
-                              <Badge bg={student.isActive ? 'success' : 'warning'}>
-                                {student.isActive ? 'Active' : 'Inactive'}
-                              </Badge>
+                            <td className="d-flex gap-2">
+                              <Button variant="outline-info" size="sm" onClick={() => handleViewProfile(student, 'student')}>
+                                View Profile
+                              </Button>
+                              <Button variant="outline-danger" size="sm" onClick={() => handleDeleteStudent(student._id)}>
+                                Delete
+                              </Button>
                             </td>
                           </tr>
                         ))}
@@ -777,25 +869,33 @@ const HODDashboard = () => {
                     <h5 className="fw-bold mb-0">📢 Announcements</h5>
                     <Button
                       variant="primary"
-                      onClick={() => setShowAnnouncementModal(true)}
+                      onClick={() => { setEditingAnnouncement(null); setShowAnnouncementModal(true); }}
                     >
                       + New Announcement
                     </Button>
                   </div>
                   <div className="d-flex flex-column gap-3">
                     {announcements.map(announcement => (
-                      <div key={announcement.id} className="p-3 border rounded-3">
+                      <div key={announcement._id || announcement.id} className="p-3 border rounded-3 bg-white shadow-sm">
                         <div className="d-flex justify-content-between align-items-start">
                           <div>
                             <h6 className="fw-bold mb-1">{announcement.title}</h6>
                             <p className="text-muted mb-2">{announcement.message}</p>
-                            <small className="text-muted">Posted on {announcement.date}</small>
+                            <small className="text-muted">Posted on {announcement.date || new Date(announcement.createdAt).toLocaleDateString()}</small>
                           </div>
-                          <Badge
-                            bg={announcement.type === 'Deadline' ? 'danger' : 'info'}
-                          >
-                            {announcement.type}
-                          </Badge>
+                          <div className="d-flex align-items-center gap-3">
+                            <Badge
+                              bg={announcement.type === 'Deadline' ? 'danger' : 'info'}
+                            >
+                              {announcement.type}
+                            </Badge>
+                            <Button variant="outline-primary" size="sm" onClick={() => { setEditingAnnouncement(announcement); setShowAnnouncementModal(true); }}>
+                              ✏️
+                            </Button>
+                            <Button variant="outline-danger" size="sm" onClick={() => handleDeleteAnnouncement(announcement._id || announcement.id)}>
+                              🗑️
+                            </Button>
+                          </div>
                         </div>
                       </div>
                     ))}
@@ -814,7 +914,11 @@ const HODDashboard = () => {
                 <Card.Body className="p-4">
                   <div className="d-flex justify-content-between align-items-center mb-4">
                     <h5 className="fw-bold mb-0">⏰ Project Deadlines & Milestones</h5>
-                    <Button variant="primary" onClick={() => setShowDeadlineModal(true)}>
+                    <Button variant="primary" onClick={() => {
+                      setEditingDeadline(null);
+                      setDeadlineForm({ title: 'Proposal Deadline', customTitle: '', date: '', description: '' });
+                      setShowDeadlineModal(true);
+                    }}>
                       + Set New Deadline
                     </Button>
                   </div>
@@ -828,16 +932,32 @@ const HODDashboard = () => {
                             <h6 className="fw-bold mb-1">{deadline.title === 'Other' ? deadline.customTitle : deadline.title}</h6>
                             <p className="text-muted mb-0 small">{deadline.description}</p>
                           </div>
-                          <div className="text-end d-flex align-items-center gap-4">
+                          <div className="text-end d-flex align-items-center gap-3">
                             <div>
                               <div className="fw-bold text-danger fs-5">{new Date(deadline.date).toLocaleDateString()}</div>
                               <small className="text-muted">
                                 {Math.ceil((new Date(deadline.date) - new Date()) / (1000 * 60 * 60 * 24))} days left
                               </small>
                             </div>
-                            <Button variant="outline-danger" size="sm" onClick={() => handleDeleteDeadline(deadline._id)}>
-                              🗑️
-                            </Button>
+                            <div className="d-flex gap-2">
+                              <Button variant="outline-primary" size="sm" onClick={() => {
+                                setEditingDeadline(deadline);
+                                const dateObj = new Date(deadline.date);
+                                const formattedDate = !isNaN(dateObj.getTime()) ? dateObj.toISOString().split('T')[0] : '';
+                                setDeadlineForm({
+                                  title: deadline.title,
+                                  customTitle: deadline.customTitle || '',
+                                  date: formattedDate,
+                                  description: deadline.description || ''
+                                });
+                                setShowDeadlineModal(true);
+                              }}>
+                                ✏️
+                              </Button>
+                              <Button variant="outline-danger" size="sm" onClick={() => handleDeleteDeadline(deadline._id)}>
+                                🗑️
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       ))}
@@ -1057,12 +1177,12 @@ const HODDashboard = () => {
       </Modal>
 
       {/* Deadline Modal */}
-      <Modal show={showDeadlineModal} onHide={() => setShowDeadlineModal(false)} centered>
+      <Modal show={showDeadlineModal} onHide={() => { setShowDeadlineModal(false); setEditingDeadline(null); }} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Set New Deadline</Modal.Title>
+          <Modal.Title>{editingDeadline ? 'Edit Deadline' : 'Set New Deadline'}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form onSubmit={handleCreateDeadline}>
+          <Form onSubmit={handleSubmitDeadline}>
             <Form.Group className="mb-3">
               <Form.Label>Deadline Type</Form.Label>
               <Form.Select 
@@ -1092,11 +1212,11 @@ const HODDashboard = () => {
               <Form.Control as="textarea" rows={3} placeholder="Add instructions or details" value={deadlineForm.description} onChange={(e) => setDeadlineForm({...deadlineForm, description: e.target.value})} />
             </Form.Group>
             <div className="d-flex justify-content-end gap-2">
-              <Button variant="secondary" onClick={() => setShowDeadlineModal(false)}>
+              <Button variant="secondary" onClick={() => { setShowDeadlineModal(false); setEditingDeadline(null); }}>
                 Cancel
               </Button>
               <Button variant="primary" type="submit">
-                Set Deadline
+                {editingDeadline ? 'Save Changes' : 'Set Deadline'}
               </Button>
             </div>
           </Form>
@@ -1207,15 +1327,15 @@ const HODDashboard = () => {
       </Modal>
 
       {/* Announcement Modal */}
-      <Modal show={showAnnouncementModal} onHide={() => setShowAnnouncementModal(false)} centered>
+      <Modal show={showAnnouncementModal} onHide={() => { setShowAnnouncementModal(false); setEditingAnnouncement(null); }} centered>
         <Modal.Header closeButton>
-          <Modal.Title>Create Announcement</Modal.Title>
+          <Modal.Title>{editingAnnouncement ? 'Edit Announcement' : 'Create Announcement'}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
-          <Form onSubmit={handleCreateAnnouncement}>
+          <Form onSubmit={handleSubmitAnnouncement}>
             <Form.Group className="mb-3">
               <Form.Label>Title</Form.Label>
-              <Form.Control name="title" placeholder="Announcement title" required />
+              <Form.Control name="title" defaultValue={editingAnnouncement?.title || ''} placeholder="Announcement title" required />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Message</Form.Label>
@@ -1223,13 +1343,14 @@ const HODDashboard = () => {
                 as="textarea"
                 rows={4}
                 name="message"
+                defaultValue={editingAnnouncement?.message || ''}
                 placeholder="Announcement message"
                 required
               />
             </Form.Group>
             <Form.Group className="mb-4">
               <Form.Label>Type</Form.Label>
-              <Form.Select name="type">
+              <Form.Select name="type" defaultValue={editingAnnouncement?.type || 'General'}>
                 <option value="General">General</option>
                 <option value="Deadline">Deadline</option>
                 <option value="Important">Important</option>
@@ -1238,26 +1359,121 @@ const HODDashboard = () => {
             </Form.Group>
             <Form.Group className="mb-4">
               <Form.Label>Target Audience</Form.Label>
-              <Form.Select name="targetAudience" required>
+              <Form.Select name="targetAudience" defaultValue={editingAnnouncement?.targetAudience || 'All'} required>
                 <option value="All">All (Students & Staff)</option>
                 <option value="Students">Students Only</option>
                 <option value="Staff">Staff Only</option>
               </Form.Select>
             </Form.Group>
             <div className="d-flex gap-2 justify-content-end">
-              <Button variant="secondary" onClick={() => setShowAnnouncementModal(false)}>
+              <Button variant="secondary" onClick={() => { setShowAnnouncementModal(false); setEditingAnnouncement(null); }}>
                 Cancel
               </Button>
               <Button variant="primary" type="submit">
-                Post Announcement
+                {editingAnnouncement ? 'Save Changes' : 'Post Announcement'}
               </Button>
             </div>
           </Form>
         </Modal.Body>
+      </Modal>
+
+      {/* Profile Modal */}
+      <Modal show={showProfileModal} onHide={() => setShowProfileModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>{selectedProfileUser?.profileType === 'staff' ? 'Staff Profile' : 'Student Profile'}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedProfileUser && (
+            <div>
+              <div className="text-center mb-4">
+                <div className="d-inline-flex align-items-center justify-content-center bg-primary text-white rounded-circle mb-3" style={{ width: '80px', height: '80px', fontSize: '32px' }}>
+                  {selectedProfileUser.name.charAt(0).toUpperCase()}
+                </div>
+                <h4 className="fw-bold mb-1">{selectedProfileUser.name}</h4>
+                <Badge bg="secondary">{selectedProfileUser.profileType === 'staff' ? 'Staff' : 'Student'}</Badge>
+              </div>
+              <Table bordered>
+                <tbody>
+                  <tr>
+                    <td className="fw-semibold" style={{ width: '40%' }}>Name</td>
+                    <td>{selectedProfileUser.name}</td>
+                  </tr>
+
+                  <tr>
+                    <td className="fw-semibold">Email</td>
+                    <td>{selectedProfileUser.email}</td>
+                  </tr>
+                  {selectedProfileUser.profileType === 'staff' ? (
+                    <>
+                      <tr>
+                        <td className="fw-semibold">Employee ID</td>
+                        <td>{selectedProfileUser.employeeId}</td>
+                      </tr>
+                      <tr>
+                        <td className="fw-semibold">Assigned Projects</td>
+                        <td>{selectedProfileUser.assignedProjects || 0}</td>
+                      </tr>
+                      <tr>
+                        <td className="fw-semibold">Department</td>
+                        <td>{selectedProfileUser.department || 'N/A'}</td>
+                      </tr>
+                      <tr>
+                        <td className="fw-semibold">Phone</td>
+                        <td>{selectedProfileUser.phone || 'N/A'}</td>
+                      </tr>
+                    </>
+                  ) : (
+                    <>
+                      <tr>
+                        <td className="fw-semibold">Student ID</td>
+                        <td>{selectedProfileUser.studentId}</td>
+                      </tr>
+                      <tr>
+                        <td className="fw-semibold">Department</td>
+                        <td>{selectedProfileUser.department || 'N/A'}</td>
+                      </tr>
+                      <tr>
+                        <td className="fw-semibold">Phone</td>
+                        <td>{selectedProfileUser.phone || 'N/A'}</td>
+                      </tr>
+                    </>
+                  )}
+
+                </tbody>
+              </Table>
+            </div>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowProfileModal(false)}>
+            Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal show={showDeleteModal} onHide={() => setShowDeleteModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Delete</Modal.Title>
+        </Modal.Header>
+
+        <Modal.Body>
+          <>
+            Are you sure you want to delete this {deleteInfo.type === 'staff' ? 'staff member' : deleteInfo.type === 'student' ? 'student' : deleteInfo.type === 'announcement' ? 'announcement' : 'deadline'}? This action cannot be undone.
+          </>
+        </Modal.Body>
+
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDeleteModal(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={confirmDelete} disabled={loading}>
+            {loading ? 'Deleting...' : 'Delete'}
+          </Button>
+        </Modal.Footer>
       </Modal>
     </div>
   );
 };
 
 export default HODDashboard;
-
