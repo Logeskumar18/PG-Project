@@ -49,6 +49,14 @@ const studentSchema = new mongoose.Schema(
       ref: 'Staff',
       required: false // Set to true if all students must be created by staff
     },
+    resetPasswordToken: {
+      type: String,
+      default: null
+    },
+    resetPasswordExpires: {
+      type: Date,
+      default: null
+    },
     createdAt: {
       type: Date,
       default: Date.now

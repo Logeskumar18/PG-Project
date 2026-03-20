@@ -17,8 +17,6 @@ const notificationSchema = new mongoose.Schema({
       'MILESTONE_ASSIGNED',
       'MILESTONE_DUE',
       'DEADLINE_REMINDER',
-      'TEAM_CREATED',
-      'TEAM_MEMBER_ADDED',
       'PROGRESS_SUBMITTED',
       'PROGRESS_REVIEWED',
       'MESSAGE_RECEIVED',
@@ -40,7 +38,7 @@ const notificationSchema = new mongoose.Schema({
   relatedTo: {
     type: {
       type: String,
-      enum: ['Project', 'Document', 'Milestone', 'Team', 'Message', 'Announcement', 'Mark'],
+      enum: ['Project', 'Document', 'Milestone', 'Message', 'Announcement', 'Mark'],
     },
     referenceId: {
       type: mongoose.Schema.Types.ObjectId,

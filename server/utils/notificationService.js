@@ -243,39 +243,11 @@ export const notifyMilestoneDueSoon = async (milestone, studentId) => {
   });
 };
 
-// Team-related notifications
-export const notifyTeamCreation = async (team, memberIds) => {
-  const notifications = memberIds.map(memberId => ({
-    userId: memberId,
-    type: 'TEAM_CREATED',
-    title: '👥 Added to Team',
-    message: `You have been added to team: ${team.name}`,
-    relatedTo: { type: 'Team', referenceId: team._id },
-    priority: 'Medium',
-    actionUrl: `/team/${team._id}`
-  }));
-
-  await createBulkNotifications(notifications);
-};
-
-export const notifyTeamMemberAdded = async (team, newMemberId) => {
-  await createNotification({
-    userId: newMemberId,
-    type: 'TEAM_MEMBER_ADDED',
-    title: '👥 Added to Team',
-    message: `You have been added to team: ${team.name}`,
-    relatedTo: { type: 'Team', referenceId: team._id },
-    priority: 'Medium',
-    actionUrl: `/team/${team._id}`
-  });
-};
-
-export const notifyProgressSubmission = async (progress, projectOrTeam, type = 'Project') => {
-  // Handle both Project (solo) and Team
-  let guideId = type === 'Team' ? projectOrTeam.guideId : projectOrTeam.assignedGuideId;
-  let title = type === 'Team' ? projectOrTeam.name : projectOrTeam.title;
-  let referenceId = type === 'Team' ? projectOrTeam._id : progress._id; // Link to team or progress
-  let actionUrl = type === 'Team' ? `/team/${projectOrTeam._id}?tab=progress` : `/dashboard/staff?tab=progress`;
+export const notifyProgressSubmission = async (progress, project) => {
+  let guideId = project.assignedGuideId;
+  let title = project.title;
+  let referenceId = progress._id;
+  let actionUrl = `/dashboard/staff?tab=progress`;
 
   if (guideId) {
     // Ensure we have the guide object with email
@@ -289,8 +261,8 @@ export const notifyProgressSubmission = async (progress, projectOrTeam, type = '
         userId: guide._id,
         type: 'PROGRESS_SUBMITTED',
         title: '📈 Progress Update Submitted',
-        message: `New progress update for ${type.toLowerCase()}: ${title} (Week ${progress.weekNumber})`,
-        relatedTo: { type: type === 'Team' ? 'Team' : 'Progress', referenceId: referenceId },
+        message: `New progress update for project: ${title} (Week ${progress.weekNumber})`,
+        relatedTo: { type: 'Progress', referenceId: referenceId },
         priority: 'Low',
         actionUrl: actionUrl
       });
@@ -307,7 +279,7 @@ export const notifyProgressSubmission = async (progress, projectOrTeam, type = '
               <p>Dear <strong>${guide.name}</strong>,</p>
               <p>A new progress update has been submitted.</p>
               <div style="background-color: #f9fafb; padding: 15px; border-left: 4px solid #4f46e5; margin: 20px 0;">
-                <p style="margin: 0;"><strong>${type}:</strong> ${title}</p>
+                <p style="margin: 0;"><strong>Project:</strong> ${title}</p>
                 <p style="margin: 5px 0 0;"><strong>Week:</strong> ${progress.weekNumber}</p>
                 <p style="margin: 5px 0 0;"><strong>Progress:</strong> ${progress.progressPercentage}%</p>
                 <p style="margin: 5px 0 0;"><strong>Description:</strong> ${progress.description}</p>
@@ -864,8 +836,6 @@ export default {
   notifyDocumentReview,
   notifyMilestoneAssignment,
   notifyMilestoneDueSoon,
-  notifyTeamCreation,
-  notifyTeamMemberAdded,
   notifyProgressSubmission,
   notifyProgressReview,
   notifyGuideAssignment,

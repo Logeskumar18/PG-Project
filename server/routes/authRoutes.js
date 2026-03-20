@@ -5,7 +5,11 @@ import {
   login,
   getProfile,
   updateProfile,
-  getAllUsers
+  getAllUsers,
+  forgotPassword,
+  resetPassword,
+  forgotPasswordOtp,
+  resetPasswordOtp
 } from '../controllers/authController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -59,6 +63,10 @@ const loginValidation = [
 // Public routes
 router.post('/register', registerValidation, register);
 router.post('/login', loginValidation, login);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
+router.post('/forgot-password-otp', forgotPasswordOtp);
+router.post('/reset-password-otp', resetPasswordOtp);
 
 // Protected routes (require authentication)
 router.get('/profile', protect, getProfile);

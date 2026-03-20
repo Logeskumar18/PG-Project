@@ -3,8 +3,8 @@ import Document from '../models/Document.js';
 import Milestone from '../models/Milestone.js';
 import Progress from '../models/Progress.js';
 import Staff from '../models/Staff.js';
-import Team from '../models/Team.js';
 import Mark from '../models/Mark.js';
+import Meeting from '../models/Meeting.js';
 import { notifyProjectApproval, notifyProjectRejection, notifyDocumentReview, notifyProgressReview, notifyMarksAssigned, createNotification } from '../utils/notificationService.js';
 import { sendMail } from '../utils/mailer.js';
 import Student from '../models/Student.js';
@@ -22,24 +22,15 @@ export const getAssignedStudents = async (req, res) => {
 
     // 2. Find students assigned to this staff via Projects
     const assignedProjects = await Project.find({ assignedGuideId: staffId })
-      .select('studentId students teamId');
+      .select('studentId');
 
     let projectStudentIds = [];
     assignedProjects.forEach(p => {
       // Solo project
       if (p.studentId) projectStudentIds.push(p.studentId.toString());
-      // Team project direct refs
-      if (p.students && p.students.length > 0) {
-        p.students.forEach(sId => projectStudentIds.push(sId.toString()));
-      }
     });
 
-    // 3. For teams, we might need to fetch team members if not in project.students
-    // But usually project.students should be populated. If not, we might miss some.
-    // Assuming project.students is kept in sync or we rely on solo studentId for now.
-    // (Project model has students array for teams).
-
-    // Combine IDs
+    // 3. Combine IDs
     const allStudentIds = [...new Set([...createdStudentIds, ...projectStudentIds])];
 
     // Fetch details
@@ -74,13 +65,47 @@ export const getAssignedStudents = async (req, res) => {
   }
 };
 
+// ================= MEETINGS =================
+export const getGuideMeetings = async (req, res) => {
+  try {
+    const meetings = await Meeting.find({ guideId: req.user._id })
+      .populate('studentId', 'name studentId')
+      .populate('projectId', 'title')
+      .sort({ date: 1, time: 1 });
+    res.json({ status: 'success', data: meetings });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+export const updateMeetingStatus = async (req, res) => {
+  try {
+    const { meetingId } = req.params;
+    const { status, meetingLink, guideRemarks } = req.body;
+    
+    const meeting = await Meeting.findOneAndUpdate(
+      { _id: meetingId, guideId: req.user._id },
+      { status, meetingLink, guideRemarks },
+      { new: true }
+    ).populate('studentId', 'name email');
+
+    if (!meeting) {
+      return res.status(404).json({ status: 'error', message: 'Meeting not found' });
+    }
+
+    res.json({ status: 'success', data: meeting });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
 // Get all projects for staff
 export const getStaffProjects = async (req, res) => {
   try {
     const staffId = req.user._id;
     console.log('DEBUG: getStaffProjects - staffId:', staffId);
 
-    const projects = await Project.find({ assignedGuideId: staffId })
+    const projects = await Project.find({ assignedGuideId: staffId, isArchived: { $ne: true } })
       .populate('studentId', 'name studentId')
       .sort({ createdAt: -1 });
 
@@ -541,18 +566,10 @@ export const createMilestone = async (req, res) => {
     if (soloProject) {
       project = soloProject;
     } else {
-      // Check team projects
-      const teamProjects = await Project.find({
-        teamId: { $exists: true },
-        assignedGuideId: req.user._id
+      return res.status(404).json({
+        status: "error",
+        message: "Project not found for this student"
       });
-      for (const p of teamProjects) {
-        const team = await Team.findById(p.teamId);
-        if (team && team.members.some(member => member.studentId.toString() === studentObjectId.toString())) {
-          project = p;
-          break;
-        }
-      }
     }
 
     if (!project) {
@@ -713,21 +730,23 @@ export const getDashboardOverview = async (req, res) => {
   try {
     const staffId = req.user._id;
 
-    const totalProjects = await Project.countDocuments({ assignedGuideId: staffId });
+    const totalProjects = await Project.countDocuments({ assignedGuideId: staffId, isArchived: { $ne: true } });
     const pendingApprovals = await Project.countDocuments({
       assignedGuideId: staffId,
-      approvalStatus: 'Pending'
+      approvalStatus: 'Pending',
+      isArchived: { $ne: true }
     });
     const approvedProjects = await Project.countDocuments({
       assignedGuideId: staffId,
-      approvalStatus: 'Approved'
+      approvalStatus: 'Approved',
+      isArchived: { $ne: true }
     });
     const pendingDocuments = await Document.countDocuments({
       reviewStatus: 'Pending',
-      projectId: { $in: (await Project.find({ assignedGuideId: staffId }).select('_id')).map(p => p._id) }
+      projectId: { $in: (await Project.find({ assignedGuideId: staffId, isArchived: { $ne: true } }).select('_id')).map(p => p._id) }
     });
 
-    const recentProjects = await Project.find({ assignedGuideId: staffId })
+    const recentProjects = await Project.find({ assignedGuideId: staffId, isArchived: { $ne: true } })
       .populate('studentId', 'name studentId')
       .sort({ createdAt: -1 })
       .limit(5);

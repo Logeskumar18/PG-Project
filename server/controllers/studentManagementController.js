@@ -1,7 +1,5 @@
 import Student from '../models/Student.js';
-import Team from '../models/Team.js';
 import Project from '../models/Project.js';
-import { notifyTeamCreation } from '../utils/notificationService.js';
 import { sendMail } from '../utils/mailer.js';
 
 const isStudentAssignedToStaff = async (studentId, staffId) => {
@@ -164,82 +162,6 @@ Project Portal Team`,
   }
 };
 
-// Create team with students
-export const createTeamWithStudents = async (req, res) => {
-  try {
-    const { teamName, projectTitle, projectDescription, memberIds, leaderId } = req.body;
-    const guideId = req.user._id;
-
-    // Validate that all members exist and are students
-    const students = await User.find({
-      _id: { $in: memberIds },
-      role: 'Student'
-    });
-
-    if (students.length !== memberIds.length) {
-      return res.status(400).json({
-        message: 'One or more invalid student IDs'
-      });
-    }
-
-    // Validate leader is in the member list
-    if (!memberIds.includes(leaderId)) {
-      return res.status(400).json({
-        message: 'Team leader must be one of the team members'
-      });
-    }
-
-    // Create project for the team
-    const project = await Project.create({
-      studentId: leaderId, // Assign to team leader
-      assignedGuideId: guideId,
-      title: projectTitle,
-      description: projectDescription,
-      status: 'Planning',
-      approvalStatus: 'Pending'
-    });
-
-    // Build members array with roles
-    const members = memberIds.map(memberId => ({
-      studentId: memberId,
-      role: memberId.toString() === leaderId.toString() ? 'Leader' : 'Member'
-    }));
-
-    // Create team
-    const team = await Team.create({
-      name: teamName,
-      projectId: project._id,
-      members,
-      guideId,
-      overallProgress: 0,
-      status: 'Active'
-    });
-
-    // Populate team data
-    const populatedTeam = await Team.findById(team._id)
-      .populate('members.studentId', 'name email studentId')
-      .populate('projectId', 'title description status')
-      .populate('guideId', 'name email');
-
-    // Send notifications to all team members
-    await notifyTeamCreation(team, memberIds);
-
-    res.status(201).json({
-      success: true,
-      message: 'Team and project created successfully',
-      data: {
-        team: populatedTeam,
-        project
-      }
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error creating team',
-      error: error.message
-    });
-  }
-};
-
 // Get all students (for team creation dropdown)
 export const getAllStudents = async (req, res) => {
   try {
@@ -263,38 +185,6 @@ export const getAllStudents = async (req, res) => {
       success: true,
       data: students,
       total: students.length
-    });
-  } catch (error) {
-    res.status(500).json({
-      message: 'Error fetching students',
-      error: error.message
-    });
-  }
-};
-
-// Get students without teams
-export const getStudentsWithoutTeams = async (req, res) => {
-  try {
-    if (req.user.role === 'Staff') {
-      return res.status(403).json({
-        message: 'Staff cannot list students outside their assigned teams.'
-      });
-    }
-    // Get all student IDs who are already in teams
-    const teamsWithMembers = await Team.find({}, 'members');
-    const studentIdsInTeams = teamsWithMembers.flatMap(team =>
-      team.members.map(member => member.studentId.toString())
-    );
-
-    // Find students not in any team
-    const studentsWithoutTeams = await Student.find({
-      _id: { $nin: studentIdsInTeams }
-    }).select('name email studentId department').sort({ name: 1 });
-
-    res.json({
-      success: true,
-      data: studentsWithoutTeams,
-      total: studentsWithoutTeams.length
     });
   } catch (error) {
     res.status(500).json({
@@ -355,17 +245,6 @@ export const deleteStudent = async (req, res) => {
       }
     }
 
-    // Check if student is in any team
-    const teamWithStudent = await Team.findOne({
-      'members.studentId': studentId
-    });
-
-    if (teamWithStudent) {
-      return res.status(400).json({
-        message: 'Cannot delete student who is part of a team. Remove from team first.'
-      });
-    }
-
     const student = await Student.findByIdAndDelete(studentId);
 
     if (!student) {
@@ -386,9 +265,7 @@ export const deleteStudent = async (req, res) => {
 
 export default {
   createStudent,
-  createTeamWithStudents,
   getAllStudents,
-  getStudentsWithoutTeams,
   updateStudent,
   deleteStudent
 };

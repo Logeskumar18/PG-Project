@@ -33,7 +33,7 @@ const messageSchema = new mongoose.Schema({
   relatedTo: {
     type: {
       type: String,
-      enum: ['Project', 'Document', 'Milestone', 'Team', 'General'],
+      enum: ['Project', 'Document', 'Milestone', 'General'],
       default: 'General'
     },
     referenceId: {

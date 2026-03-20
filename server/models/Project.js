@@ -2,25 +2,11 @@ import mongoose from 'mongoose';
 
 const projectSchema = new mongoose.Schema(
   {
-    // Solo project
     studentId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'Student',
       required: false
     },
-
-    // Team project
-    teamId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Team'
-    },
-
-    students: [
-      {
-        type: mongoose.Schema.Types.ObjectId,
-        ref: 'Student'
-      }
-    ],
 
     // Assigned guide
     assignedGuideId: {
@@ -71,6 +57,15 @@ const projectSchema = new mongoose.Schema(
     submissionDate: {
       type: Date,
       default: Date.now
+    },
+
+    isArchived: {
+      type: Boolean,
+      default: false
+    },
+    
+    academicYear: {
+      type: String
     }
   },
   { timestamps: true }

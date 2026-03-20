@@ -23,11 +23,11 @@ import Staff from '../models/Staff.js';
 import { sendMail } from '../utils/mailer.js';
 import { spawn } from 'child_process';
 import Project from '../models/Project.js';
-import Team from '../models/Team.js';
 import Student from '../models/Student.js';
 import Document from '../models/Document.js';
 import Milestone from '../models/Milestone.js';
 import Progress from '../models/Progress.js';
+import Meeting from '../models/Meeting.js';
 import multer from 'multer';
 import path from 'path';
 import { createNotification, notifyDocumentSubmission, notifyProgressSubmission } from '../utils/notificationService.js';
@@ -196,18 +196,12 @@ export const createProject = async (req, res) => {
 
     // Allow multiple project submissions until one is approved
 
-    // Try to find the student's team and assign the guide
+    // Assign the guide
     let assignedGuideId = null;
-    const team = await Team.findOne({ 'members.studentId': userId });
-    if (team && team.guideId) {
-      assignedGuideId = team.guideId;
-    }
 
-    // If no guide from team, assign the staff who created the student
-    if (!assignedGuideId) {
-      if (student.createdByStaffId) {
-        assignedGuideId = student.createdByStaffId;
-      }
+    // Assign the staff who created the student
+    if (student.createdByStaffId) {
+      assignedGuideId = student.createdByStaffId;
     }
 
     const project = await Project.create({
@@ -387,18 +381,9 @@ export const getMyMilestones = async (req, res) => {
   try {
     const studentId = req.user._id;
     
-    // Find student's projects: solo projects where studentId matches, or team projects where student is a member
-    const soloProjects = await Project.find({ studentId }).select('_id');
-    const teamProjects = await Project.find({ teamId: { $exists: true } })
-      .populate({
-        path: 'teamId',
-        match: { 'members.studentId': studentId },
-        select: '_id'
-      })
-      .select('_id teamId');
-    
-    const allProjects = [...soloProjects, ...teamProjects.filter(p => p.teamId)]; // filter out where populate failed
-    const projectIds = allProjects.map(p => p._id);
+    // Find student's projects
+    const projects = await Project.find({ studentId }).select('_id');
+    const projectIds = projects.map(p => p._id);
     
     const milestones = await Milestone.find({ 
       projectId: { $in: projectIds },
@@ -476,5 +461,32 @@ export const updateMilestoneStatus = async (req, res) => {
     res.json({ success: true, message: 'Milestone status updated', data: milestone });
   } catch (error) {
     res.status(500).json({ message: 'Error updating milestone status', error: error.message });
+  }
+};
+
+// ================= MEETINGS =================
+export const requestMeeting = async (req, res) => {
+  try {
+    const studentId = req.user._id;
+    const { guideId, projectId, topic, date, time, duration } = req.body;
+
+    const meeting = await Meeting.create({
+      studentId, guideId, projectId, topic, date, time, duration
+    });
+
+    res.status(201).json({ success: true, message: 'Meeting requested', data: meeting });
+  } catch (error) {
+    res.status(500).json({ message: 'Error requesting meeting', error: error.message });
+  }
+};
+
+export const getMyMeetings = async (req, res) => {
+  try {
+    const meetings = await Meeting.find({ studentId: req.user._id })
+      .populate('guideId', 'name')
+      .sort({ date: 1, time: 1 });
+    res.json({ success: true, data: meetings });
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching meetings', error: error.message });
   }
 };

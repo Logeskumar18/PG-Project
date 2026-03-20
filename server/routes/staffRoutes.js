@@ -66,16 +66,6 @@ router.delete(
 );
 
 /* ============================
-   TEAM MANAGEMENT
-============================ */
-router.post(
-  '/teams/create',
-  protect,
-  isStaff,
-  studentMgmtController.createTeamWithStudents
-);
-
-/* ============================
    PROJECT APPROVAL (FIXED ✅)
 ============================ */
 router.get(
@@ -203,6 +193,23 @@ router.post(
   protect,
   isStaff,
   staffController.assignMarks
+);
+
+/* ============================
+   MEETINGS
+============================ */
+router.get(
+  '/meetings',
+  protect,
+  isStaff,
+  staffController.getGuideMeetings
+);
+
+router.put(
+  '/meetings/:meetingId/status',
+  protect,
+  isStaff,
+  staffController.updateMeetingStatus
 );
 
 export default router;

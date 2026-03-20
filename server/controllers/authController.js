@@ -4,6 +4,9 @@ import HOD from '../models/HOD.js';
 import { generateToken } from '../middleware/authMiddleware.js';
 import { validationResult } from 'express-validator';
 import { notifyLogin, notifyPasswordChange } from '../utils/notificationService.js';
+import jwt from 'jsonwebtoken';
+import { sendMail } from '../utils/mailer.js';
+import crypto from 'crypto';
 
 // @desc    Register a new user
 // @route   POST /api/auth/register
@@ -127,6 +130,278 @@ export const register = async (req, res) => {
 // @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public
+
+// @desc    Request password reset
+// @route   POST /api/auth/forgot-password
+// @access  Public
+export const forgotPassword = async (req, res) => {
+  try {
+    const { email, role } = req.body;
+    let UserModel;
+    if (role === 'Student') {
+      UserModel = Student;
+    } else if (role === 'Staff' || role === 'Guide') {
+      UserModel = Staff;
+    } else if (role === 'HOD') {
+      UserModel = HOD;
+    } else {
+      return res.status(400).json({ status: 'error', message: 'Invalid role.' });
+    }
+
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      // For security, don't reveal if user exists
+      return res.status(200).json({ status: 'success', message: 'If an account with that email exists, a reset link has been sent.' });
+    }
+
+    // Generate reset token (JWT)
+    const resetToken = jwt.sign(
+      { id: user._id, role },
+      process.env.JWT_SECRET,
+      { expiresIn: '1h' }
+    );
+
+    // Optionally, store hashed token and expiry in DB for extra security
+    user.resetPasswordToken = crypto.createHash('sha256').update(resetToken).digest('hex');
+    user.resetPasswordExpires = Date.now() + 60 * 60 * 1000; // 1 hour
+    await user.save();
+
+    // Send email
+    const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${resetToken}&role=${role}`;
+    await sendMail({
+      to: user.email,
+      subject: 'Password Reset Request',
+      text: `You requested a password reset. Click the link to reset your password: ${resetUrl}`,
+      html: `<p>You requested a password reset.</p><p><a href="${resetUrl}">Reset Password</a></p><p>If you did not request this, ignore this email.</p>`
+    });
+
+    res.status(200).json({ status: 'success', message: 'If an account with that email exists, a reset link has been sent.' });
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ status: 'error', message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Reset password
+// @route   POST /api/auth/reset-password
+// @access  Public
+export const resetPassword = async (req, res) => {
+  try {
+    const { token, password, role } = req.body;
+    if (!token || !password || !role) {
+      return res.status(400).json({ status: 'error', message: 'Missing required fields.' });
+    }
+
+    let UserModel;
+    if (role === 'Student') {
+      UserModel = Student;
+    } else if (role === 'Staff' || role === 'Guide') {
+      UserModel = Staff;
+    } else if (role === 'HOD') {
+      UserModel = HOD;
+    } else {
+      return res.status(400).json({ status: 'error', message: 'Invalid role.' });
+    }
+
+    // Verify token
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch (err) {
+      return res.status(400).json({ status: 'error', message: 'Invalid or expired token.' });
+    }
+
+    // Find user and check token/expiry
+    const hashedToken = crypto.createHash('sha256').update(token).digest('hex');
+    const user = await UserModel.findOne({ _id: decoded.id, resetPasswordToken: hashedToken, resetPasswordExpires: { $gt: Date.now() } });
+    if (!user) {
+      return res.status(400).json({ status: 'error', message: 'Invalid or expired token.' });
+    }
+
+    // Set new password
+    user.password = password;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    await notifyPasswordChange(user);
+
+    res.status(200).json({ status: 'success', message: 'Password reset successful. You can now log in.' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ status: 'error', message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Request password reset OTP
+// @route   POST /api/auth/forgot-password-otp
+// @access  Public
+export const forgotPasswordOtp = async (req, res) => {
+  try {
+    const { email, role } = req.body;
+    let UserModel;
+    if (role === 'Student') {
+      UserModel = Student;
+    } else if (role === 'Staff' || role === 'Guide') {
+      UserModel = Staff;
+    } else if (role === 'HOD') {
+      UserModel = HOD;
+    } else {
+      return res.status(400).json({ status: 'error', message: 'Invalid role.' });
+    }
+
+    const user = await UserModel.findOne({ email });
+    if (!user) {
+      // For security, don't reveal if user exists
+      return res.status(200).json({ status: 'success', message: 'If an account with that email exists, an OTP has been sent.' });
+    }
+
+    // Generate 6-digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Store hashed OTP and expiry in DB for security
+    user.resetPasswordToken = crypto.createHash('sha256').update(otp).digest('hex');
+    user.resetPasswordExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+    await user.save();
+
+    // Send email
+    await sendMail({
+      to: user.email,
+      subject: 'Password Reset OTP',
+      text: `Your password reset OTP is: ${otp}. It is valid for 10 minutes.`,
+      html: `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+</head>
+
+<body style="margin:0; padding:0; background-color:#f4f6f8; font-family:Arial, sans-serif;">
+
+  <table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f4f6f8; padding:20px;">
+    <tr>
+      <td align="center">
+
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff; border-radius:10px; overflow:hidden; box-shadow:0 4px 10px rgba(0,0,0,0.08);">
+
+          <!-- Header -->
+          <tr>
+            <td style="background:#4f46e5; padding:20px; text-align:center; color:#ffffff; font-size:22px; font-weight:bold;">
+              🔐 Password Reset OTP
+            </td>
+          </tr>
+
+          <!-- Content -->
+          <tr>
+            <td style="padding:30px; color:#333333;">
+
+              <p style="font-size:16px;">Hello,</p>
+
+              <p style="font-size:15px; line-height:1.6;">
+                We received a request to reset your password. Use the OTP below to proceed:
+              </p>
+
+              <!-- OTP Box -->
+              <div style="text-align:center; margin:30px 0;">
+                <span style="
+                  display:inline-block;
+                  background:#eef2ff;
+                  color:#4f46e5;
+                  font-size:30px;
+                  font-weight:bold;
+                  padding:15px 30px;
+                  border-radius:8px;
+                  letter-spacing:5px;
+                ">
+                  ${otp}
+                </span>
+              </div>
+
+              <p style="font-size:14px; color:#555;">
+                ⏳ This OTP is valid for <strong>10 minutes</strong>.
+              </p>
+
+              <p style="font-size:14px; color:#999; margin-top:25px;">
+                If you didn’t request this, you can safely ignore this email.
+              </p>
+
+            </td>
+          </tr>
+
+          <!-- Footer -->
+          <tr>
+            <td style="background:#f9fafb; text-align:center; padding:15px; font-size:12px; color:#888;">
+              © 2026 Academic Project Platform • All rights reserved
+            </td>
+          </tr>
+
+        </table>
+
+      </td>
+    </tr>
+  </table>
+
+</body>
+</html>
+`
+    });
+
+    res.status(200).json({ status: 'success', message: 'An OTP has been sent to your email.' });
+  } catch (error) {
+    console.error('Forgot password OTP error:', error);
+    res.status(500).json({ status: 'error', message: 'Server error', error: error.message });
+  }
+};
+
+// @desc    Reset password using OTP
+// @route   POST /api/auth/reset-password-otp
+// @access  Public
+export const resetPasswordOtp = async (req, res) => {
+  try {
+    const { email, role, otp, newPassword } = req.body;
+    if (!email || !role || !otp || !newPassword) {
+      return res.status(400).json({ status: 'error', message: 'Missing required fields.' });
+    }
+
+    let UserModel;
+    if (role === 'Student') {
+      UserModel = Student;
+    } else if (role === 'Staff' || role === 'Guide') {
+      UserModel = Staff;
+    } else if (role === 'HOD') {
+      UserModel = HOD;
+    } else {
+      return res.status(400).json({ status: 'error', message: 'Invalid role.' });
+    }
+
+    const hashedOtp = crypto.createHash('sha256').update(otp).digest('hex');
+    
+    // Find user by email and verify the hashed OTP matches & hasn't expired
+    const user = await UserModel.findOne({
+      email,
+      resetPasswordToken: hashedOtp,
+      resetPasswordExpires: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ status: 'error', message: 'Invalid or expired OTP.' });
+    }
+
+    // Set new password
+    user.password = newPassword;
+    user.resetPasswordToken = null;
+    user.resetPasswordExpires = null;
+    await user.save();
+
+    await notifyPasswordChange(user);
+
+    res.status(200).json({ status: 'success', message: 'Password reset successfully. You can now log in.' });
+  } catch (error) {
+    console.error('Reset password OTP error:', error);
+    res.status(500).json({ status: 'error', message: 'Server error', error: error.message });
+  }
+};
+
 export const login = async (req, res) => {
   try {
     // Check for validation errors

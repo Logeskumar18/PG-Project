@@ -42,6 +42,9 @@ const StudentDashboard = () => {
   const [composeSubject, setComposeSubject] = useState('');
   const [composeMessage, setComposeMessage] = useState('');
   const [composeLoading, setComposeLoading] = useState(false);
+  
+  const [meetings, setMeetings] = useState([]);
+  const [showMeetingModal, setShowMeetingModal] = useState(false);
 
   // Fetch announcements and projects
   const fetchAnnouncements = async () => {
@@ -131,6 +134,17 @@ const StudentDashboard = () => {
     }
   };
 
+  const fetchMeetings = async () => {
+    try {
+      const response = await api.get('/student/meetings/my');
+      if (response.data.success) {
+        setMeetings(response.data.data);
+      }
+    } catch (error) {
+      console.error('Error fetching meetings:', error);
+    }
+  };
+
   // Fetch announcements on mount
   useEffect(() => {
     fetchAnnouncements();
@@ -139,6 +153,7 @@ const StudentDashboard = () => {
     fetchDocuments();
     fetchMessages();
     fetchEvaluation();
+    fetchMeetings();
   }, []);
 
   // Fetch documents when switching to submissions tab
@@ -330,6 +345,36 @@ const StudentDashboard = () => {
     }
   };
 
+  const handleMeetingRequest = async (e) => {
+    e.preventDefault();
+    const formData = new FormData(e.target);
+    
+    if (projects.length === 0 || !projects[0].assignedGuideId) {
+      setErrorMessage("You don't have an assigned guide to request a meeting with.");
+      setShowMeetingModal(false);
+      setTimeout(() => setErrorMessage(''), 3000);
+      return;
+    }
+
+    try {
+      await api.post('/student/meetings', {
+        guideId: projects[0].assignedGuideId._id || projects[0].assignedGuideId,
+        projectId: projects[0]._id,
+        topic: formData.get('topic'),
+        date: formData.get('date'),
+        time: formData.get('time'),
+        duration: formData.get('duration')
+      });
+      setSuccessMessage('Meeting requested successfully!');
+      setShowMeetingModal(false);
+      fetchMeetings();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      setErrorMessage('Error requesting meeting: ' + (error.response?.data?.message || error.message));
+      setTimeout(() => setErrorMessage(''), 5000);
+    }
+  };
+
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const handleLogoutClick = () => {
     setShowLogoutModal(true);
@@ -432,6 +477,13 @@ const StudentDashboard = () => {
             className="fw-semibold"
           >
             📝 Evaluation
+          </Button>
+          <Button
+            variant={activeTab === 'meetings' ? 'primary' : 'light'}
+            onClick={() => setActiveTab('meetings')}
+            className="fw-semibold"
+          >
+            📅 Meetings
           </Button>
           {/* <Button
             variant={activeTab === 'feedback' ? 'primary' : 'light'}
@@ -625,7 +677,10 @@ const StudentDashboard = () => {
                       <Card.Body className="p-4">
                         <div className="d-flex justify-content-between align-items-start mb-4 pb-3 border-bottom">
                           <div>
-                            <h5 className="fw-bold mb-2">{project.title}</h5>
+                            <h5 className="fw-bold mb-2">
+                              {project.isArchived && <Badge bg="secondary" className="me-2 align-middle">🗄️ Archived {project.academicYear}</Badge>}
+                              {project.title}
+                            </h5>
                             <small className="text-muted">Submitted on {project.submissionDate ? new Date(project.submissionDate).toLocaleDateString() : (project.submittedAt ? new Date(project.submittedAt).toLocaleDateString() : 'N/A')}</small>
                           </div>
                           <span className={`badge ${project.approvalStatus === 'Approved' ? 'bg-success' : project.approvalStatus === 'Rejected' ? 'bg-danger' : 'bg-info'}`}>{project.approvalStatus || project.status}</span>
@@ -890,9 +945,15 @@ const StudentDashboard = () => {
                             <td>5</td>
                           </tr>
                           <tr>
-                            <td>Weekly Progress / Milestones</td>
+                            <td>Weekly Progress </td>
                             <td>{evaluation.progressMarks}</td>
                             <td>10</td>
+                          </tr>
+                          
+                          <tr>
+                            <td>1st Review</td>
+                            <td>{evaluation.interactionMarks}</td>
+                            <td>5</td>
                           </tr>
                           <tr>
                             <td>Document Quality</td>
@@ -900,12 +961,7 @@ const StudentDashboard = () => {
                             <td>15</td>
                           </tr>
                           <tr>
-                            <td>Guide Interaction</td>
-                            <td>{evaluation.interactionMarks}</td>
-                            <td>5</td>
-                          </tr>
-                          <tr>
-                            <td>Final Review</td>
+                            <td>2nd Review</td>
                             <td>{evaluation.finalReviewMarks}</td>
                             <td>5</td>
                           </tr>
@@ -918,6 +974,59 @@ const StudentDashboard = () => {
                       <div className="text-end mt-4">
                         <span className="fw-bold">Evaluator Signature: ____________________</span>
                       </div>
+                    </div>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        )}
+
+        {/* Meetings Tab */}
+        {activeTab === 'meetings' && (
+          <Row className="g-4">
+            <Col lg={12}>
+              <Card className="border-0 shadow-sm">
+                <Card.Body className="p-4">
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h5 className="fw-bold mb-0">📅 My Meetings</h5>
+                    <Button 
+                      variant="primary" 
+                      size="sm"
+                      onClick={() => setShowMeetingModal(true)}
+                    >
+                      🗓️ Request Meeting
+                    </Button>
+                  </div>
+                  {meetings.length === 0 ? (
+                    <div className="text-center text-muted py-4">No meetings requested yet.</div>
+                  ) : (
+                    <div className="d-flex flex-column gap-3">
+                      {meetings.map(meeting => (
+                        <div key={meeting._id} className="p-3 border rounded-3 d-flex justify-content-between align-items-center bg-white shadow-sm">
+                          <div>
+                            <h6 className="fw-bold mb-1">{meeting.topic}</h6>
+                            <small className="text-muted d-block mb-2">
+                              Guide: <strong>{meeting.guideId?.name || 'Assigned Guide'}</strong>
+                            </small>
+                            <div className="mb-1">
+                              <span className="badge bg-secondary me-2">🕒 {new Date(meeting.date).toLocaleDateString()} at {meeting.time}</span>
+                              <span className="badge bg-info">{meeting.duration} mins</span>
+                            </div>
+                            {meeting.meetingLink && (
+                              <a href={meeting.meetingLink} target="_blank" rel="noopener noreferrer" className="small fw-semibold mt-2 d-inline-block">🔗 Join Meeting</a>
+                            )}
+                            {meeting.guideRemarks && (
+                              <div className="mt-2 small text-muted"><strong>Remarks:</strong> {meeting.guideRemarks}</div>
+                            )}
+                          </div>
+                          <div className="text-end">
+                            <Badge bg={meeting.status === 'Approved' ? 'success' : meeting.status === 'Rejected' ? 'danger' : meeting.status === 'Completed' ? 'primary' : 'warning'}>
+                              {meeting.status}
+                            </Badge>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </Card.Body>
@@ -1232,6 +1341,51 @@ const StudentDashboard = () => {
               >
                 {composeLoading ? 'Sending...' : 'Send Message'}
               </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* Meeting Request Modal */}
+      <Modal show={showMeetingModal} onHide={() => setShowMeetingModal(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>🗓️ Request a Meeting</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleMeetingRequest}>
+            <Form.Group className="mb-3">
+              <Form.Label>Topic / Agenda *</Form.Label>
+              <Form.Control
+                type="text"
+                name="topic"
+                placeholder="e.g. Project Architecture Review"
+                required
+              />
+            </Form.Group>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Date *</Form.Label>
+                  <Form.Control type="date" name="date" required />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Time *</Form.Label>
+                  <Form.Control type="time" name="time" required />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Form.Group className="mb-4">
+              <Form.Label>Duration *</Form.Label>
+              <Form.Select name="duration" required>
+                <option value="15">15 Minutes</option>
+                <option value="30">30 Minutes</option>
+              </Form.Select>
+            </Form.Group>
+            <div className="d-flex gap-2 justify-content-end">
+              <Button variant="secondary" onClick={() => setShowMeetingModal(false)}>Cancel</Button>
+              <Button type="submit" variant="primary">Submit Request</Button>
             </div>
           </Form>
         </Modal.Body>

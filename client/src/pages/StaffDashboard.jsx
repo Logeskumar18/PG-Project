@@ -27,6 +27,7 @@ const StaffDashboard = () => {
   const [documents, setDocuments] = useState([]);
   const [progressUpdates, setProgressUpdates] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
+  const [meetings, setMeetings] = useState([]);
 
   // Fetch staff-scoped data
   const fetchData = async () => {
@@ -34,13 +35,14 @@ const StaffDashboard = () => {
       setLoadingData(true);
       // announcements
       setLoadingAnnouncements(true);
-      const [annRes, studentsRes, projectsRes, docsRes, progressRes, messagesRes] = await Promise.all([
+      const [annRes, studentsRes, projectsRes, docsRes, progressRes, messagesRes, meetingsRes] = await Promise.all([
         api.get('/communication/announcements'),
         api.get('/staff/students'),
         api.get('/staff/projects'),
         api.get('/staff/documents'),
         api.get('/staff/progress'),
-        api.get('/communication/messages/inbox')
+        api.get('/communication/messages/inbox'),
+        api.get('/staff/meetings').catch(() => ({ data: { data: [] } }))
       ]);
 
       if (annRes.data.data) setAnnouncements(annRes.data.data);
@@ -51,6 +53,7 @@ const StaffDashboard = () => {
       if (docsRes.data.data) setDocuments(docsRes.data.data);
       if (progressRes.data.data) setProgressUpdates(progressRes.data.data);
       if (messagesRes.data.data) setMessages(messagesRes.data.data);
+      if (meetingsRes?.data?.data) setMeetings(meetingsRes.data.data);
 
       const deadlinesRes = await api.get('/deadlines');
       if (deadlinesRes.data?.data) {
@@ -122,6 +125,23 @@ const StaffDashboard = () => {
       }
     } catch (err) {
       setErrorMessage('Error updating stage: ' + (err.response?.data?.message || err.message));
+      setTimeout(() => setErrorMessage(''), 3000);
+    }
+  };
+
+  const handleUpdateMeeting = async (meetingId, status) => {
+    try {
+      let link = '';
+      if (status === 'Approved') link = prompt('Enter meeting link (optional):', '') || '';
+      
+      const res = await api.put(`/staff/meetings/${meetingId}/status`, { status, meetingLink: link });
+      if (res.data.status === 'success') {
+        setMeetings(meetings.map(m => m._id === meetingId ? res.data.data : m));
+        setSuccessMessage(`Meeting ${status.toLowerCase()} successfully`);
+        setTimeout(() => setSuccessMessage(''), 3000);
+      }
+    } catch (err) {
+      setErrorMessage('Error updating meeting: ' + (err.response?.data?.message || err.message));
       setTimeout(() => setErrorMessage(''), 3000);
     }
   };
@@ -466,6 +486,13 @@ const StaffDashboard = () => {
             className="fw-semibold"
           >
             📈 Student Progress
+          </Button>
+          <Button
+            variant={activeTab === 'meetings' ? 'primary' : 'light'}
+            onClick={() => setActiveTab('meetings')}
+            className="fw-semibold"
+          >
+            📅 Meetings
           </Button>
           <Button
             variant={activeTab === 'create-student' ? 'primary' : 'light'}
@@ -1043,6 +1070,58 @@ const StaffDashboard = () => {
           </Row>
         )}
 
+        {/* Meetings Tab */}
+        {activeTab === 'meetings' && (
+          <Row className="g-4">
+            <Col lg={12}>
+              <Card className="border-0 shadow-sm mb-4">
+                <Card.Body className="p-4">
+                  <h5 className="fw-bold mb-4">📅 Meeting Requests</h5>
+                  {meetings.length === 0 ? (
+                    <div className="text-center text-muted py-4">No meeting requests found.</div>
+                  ) : (
+                    <div className="d-flex flex-column gap-3">
+                      {meetings.map(meeting => (
+                        <div key={meeting._id} className="p-3 border rounded-3 d-flex justify-content-between align-items-center bg-white shadow-sm">
+                          <div>
+                            <h6 className="fw-bold mb-1">{meeting.topic}</h6>
+                            <small className="text-muted d-block mb-2">
+                              Student: <strong>{meeting.studentId?.name}</strong> | Project: {meeting.projectId?.title || 'N/A'}
+                            </small>
+                            <div className="mb-1">
+                              <span className="badge bg-secondary me-2">🕒 {new Date(meeting.date).toLocaleDateString()} at {meeting.time}</span>
+                              <span className="badge bg-info">{meeting.duration} mins</span>
+                            </div>
+                            {meeting.meetingLink && (
+                              <a href={meeting.meetingLink} target="_blank" rel="noopener noreferrer" className="small fw-semibold">🔗 Join Meeting</a>
+                            )}
+                          </div>
+                          <div className="text-end">
+                            <div className="mb-2">
+                              <Badge bg={meeting.status === 'Approved' ? 'success' : meeting.status === 'Rejected' ? 'danger' : meeting.status === 'Completed' ? 'primary' : 'warning'}>
+                                {meeting.status}
+                              </Badge>
+                            </div>
+                            {meeting.status === 'Pending' && (
+                              <div className="d-flex gap-2">
+                                <Button variant="outline-success" size="sm" onClick={() => handleUpdateMeeting(meeting._id, 'Approved')}>Approve</Button>
+                                <Button variant="outline-danger" size="sm" onClick={() => handleUpdateMeeting(meeting._id, 'Rejected')}>Reject</Button>
+                              </div>
+                            )}
+                            {meeting.status === 'Approved' && (
+                               <Button variant="outline-primary" size="sm" onClick={() => handleUpdateMeeting(meeting._id, 'Completed')}>Mark Completed</Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        )}
+
         {/* Create Student Tab */}
         {activeTab === 'create-student' && (
           <Row className="g-4">
@@ -1117,119 +1196,6 @@ const StaffDashboard = () => {
                       </Button>
                       <Button variant="primary" type="submit">
                         Create Student
-                      </Button>
-                    </div>
-                  </Form>
-                </Card.Body>
-              </Card>
-            </Col>
-          </Row>
-        )}
-
-        {/* Create Team Tab */}
-        {activeTab === 'create-team' && (
-          <Row className="g-4">
-            <Col lg={10} className="mx-auto">
-              <Card className="border-0 shadow-sm">
-                <Card.Body className="p-4">
-                  <h5 className="fw-bold mb-4">👥 Create New Team</h5>
-                  <Form onSubmit={async (e) => {
-                    e.preventDefault();
-                    const form = e.target;
-                    const teamName = form[0].value;
-                    const projectTitle = form[1].value;
-                    const projectDescription = form[2].value;
-                    const leaderId = form[3].value;
-                    const memberOptions = form[4].options;
-                    const memberIds = [];
-                    for (let i = 0; i < memberOptions.length; i++) {
-                      if (memberOptions[i].selected) memberIds.push(memberOptions[i].value);
-                    }
-                    try {
-                      await api.post('/staff/teams/create', {
-                        name: teamName,
-                        projectTitle,
-                        projectDescription,
-                        leaderId,
-                        memberIds
-                      });
-                      setSuccessMessage('Team created successfully!');
-                      form.reset();
-                      setTimeout(() => setSuccessMessage(''), 3000);
-                    } catch (err) {
-                      setSuccessMessage('Error creating team: ' + (err.response?.data?.message || err.message));
-                    }
-                  }}>
-                    <h6 className="fw-bold mb-3">Team Details</h6>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Team Name *</Form.Label>
-                      <Form.Control
-                        type="text"
-                        placeholder="e.g., Team Alpha"
-                        required
-                      />
-                    </Form.Group>
-
-                    <h6 className="fw-bold mb-3 mt-4">Project Information</h6>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Project Title *</Form.Label>
-                      <Form.Control
-                        type="text"
-                        placeholder="Enter project title"
-                        required
-                      />
-                    </Form.Group>
-
-                    <Form.Group className="mb-3">
-                      <Form.Label>Project Description</Form.Label>
-                      <Form.Control
-                        as="textarea"
-                        rows={3}
-                        placeholder="Brief description of the project"
-                      />
-                    </Form.Group>
-
-                    <h6 className="fw-bold mb-3 mt-4">Team Members</h6>
-                    <Form.Group className="mb-3">
-                      <Form.Label>Team Leader *</Form.Label>
-                      <Form.Select required>
-                        <option value="">Select team leader...</option>
-                        {assignedStudents.map(s => (
-                          <option key={s._id || s.id} value={s._id || s.id}>{s.name} ({s.studentId || s.email})</option>
-                        ))}
-                      </Form.Select>
-                      <Form.Text className="text-muted">
-                        Only students without teams are shown
-                      </Form.Text>
-                    </Form.Group>
-
-                    <Form.Group className="mb-3">
-                      <Form.Label>Additional Team Members</Form.Label>
-                      <Form.Control
-                        as="select"
-                        multiple
-                        size="lg"
-                        style={{ height: '150px' }}
-                      >
-                        {assignedStudents.map(s => (
-                          <option key={s._id || s.id} value={s._id || s.id}>{s.name} ({s.studentId || s.email})</option>
-                        ))}
-                      </Form.Control>
-                      <Form.Text className="text-muted">
-                        Hold Ctrl/Cmd to select multiple students
-                      </Form.Text>
-                    </Form.Group>
-
-                    <div className="alert alert-info">
-                      <strong>ℹ️ Note:</strong> Team members will be notified via email and system notification once the team is created.
-                    </div>
-
-                    <div className="d-flex gap-2 justify-content-end mt-4">
-                      <Button variant="secondary" onClick={() => setActiveTab('students')}>
-                        Cancel
-                      </Button>
-                      <Button variant="primary" type="submit">
-                        Create Team & Project
                       </Button>
                     </div>
                   </Form>
@@ -1429,21 +1395,22 @@ const StaffDashboard = () => {
                   <Form.Control type="number" name="progressMarks" min="0" max="10" value={marksData.progressMarks} onChange={handleMarksChange} />
                 </Form.Group>
               </Col>
+               <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>1st Review (Max 5)</Form.Label>
+                  <Form.Control type="number" name="interactionMarks" min="0" max="5" value={marksData.interactionMarks} onChange={handleMarksChange} />
+                </Form.Group>
+              </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Documents (Max 15)</Form.Label>
                   <Form.Control type="number" name="documentMarks" min="0" max="15" value={marksData.documentMarks} onChange={handleMarksChange} />
                 </Form.Group>
               </Col>
+             
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Interaction (Max 5)</Form.Label>
-                  <Form.Control type="number" name="interactionMarks" min="0" max="5" value={marksData.interactionMarks} onChange={handleMarksChange} />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Review (Max 5)</Form.Label>
+                  <Form.Label>2nd Review (Max 5)</Form.Label>
                   <Form.Control type="number" name="finalReviewMarks" min="0" max="5" value={marksData.finalReviewMarks} onChange={handleMarksChange} />
                 </Form.Group>
               </Col>

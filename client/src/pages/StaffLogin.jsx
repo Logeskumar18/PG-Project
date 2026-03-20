@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Container, Row, Col, Card, Form, Button, Alert, InputGroup, Modal } from 'react-bootstrap';
@@ -13,6 +14,7 @@ const StaffLogin = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showError, setShowError] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [showForgot, setShowForgot] = useState(false);
   
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -139,6 +141,11 @@ const StaffLogin = () => {
                         {errors.password}
                       </Form.Control.Feedback>
                     </InputGroup>
+                    <div className="mt-2 text-end">
+                      <Button variant="link" className="p-0 text-decoration-none" onClick={() => setShowForgot(true)} style={{fontSize: '0.95rem'}}>
+                        Forgot Password?
+                      </Button>
+                    </div>
                   </Form.Group>
 
                   <Button 
@@ -165,6 +172,8 @@ const StaffLogin = () => {
         </Row>
       </Container>
 
+      {/* Forgot Password Modal */}
+      <ForgotPasswordModal show={showForgot} onHide={() => setShowForgot(false)} role={"Staff"} />
       {/* Error Modal */}
       <Modal show={showError} onHide={() => setShowError(false)} centered>
         <Modal.Header closeButton className="border-0">

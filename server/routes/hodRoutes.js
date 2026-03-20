@@ -27,6 +27,7 @@ router.get('/dashboard/overview', protect, isHOD, hodController.getDashboardOver
 router.get('/analytics', protect, isHOD, hodController.getAnalytics);
 
 // Projects management
+router.post('/projects/archive', protect, isHOD, hodController.archiveProjects);
 router.get('/projects', protect, isHOD, hodController.getAllProjects);
 router.post('/projects/:projectId/approve-final', protect, isHOD, hodController.approveFinalProject);
 router.post('/projects/:projectId/reject-final', protect, isHOD, hodController.rejectFinalProject);

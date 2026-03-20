@@ -38,15 +38,18 @@ import { notifyAnnouncement } from '../utils/notificationService.js';
 // Get dashboard overview for HOD
 export const getDashboardOverview = async (req, res) => {
   try {
-    const totalProjects = await Project.countDocuments();
+    const totalProjects = await Project.countDocuments({ isArchived: { $ne: true } });
     const totalStudents = await Student.countDocuments({ isActive: true });
     const totalStaff = await Staff.countDocuments({ isActive: true });
-    const pendingApprovals = await Project.countDocuments({ approvalStatus: 'Pending' });
-    const approvedProjects = await Project.countDocuments({ approvalStatus: 'Approved' });
-    const completedProjects = await Project.countDocuments({ status: 'Completed' });
+    const pendingApprovals = await Project.countDocuments({ approvalStatus: 'Pending', isArchived: { $ne: true } });
+    const approvedProjects = await Project.countDocuments({ approvalStatus: 'Approved', isArchived: { $ne: true } });
+    const completedProjects = await Project.countDocuments({ status: 'Completed', isArchived: { $ne: true } });
 
     // Get projects by status
     const projectsByStatus = await Project.aggregate([
+      {
+        $match: { isArchived: { $ne: true } }
+      },
       {
         $group: {
           _id: '$status',
@@ -56,7 +59,7 @@ export const getDashboardOverview = async (req, res) => {
     ]);
 
     // Get recent projects
-    const recentProjects = await Project.find()
+    const recentProjects = await Project.find({ isArchived: { $ne: true } })
       .populate('studentId', 'name email studentId')
       .populate('assignedGuideId', 'name email')
       .sort({ createdAt: -1 })
@@ -83,14 +86,41 @@ export const getDashboardOverview = async (req, res) => {
   }
 };
 
+// Archive completed projects for an academic year
+export const archiveProjects = async (req, res) => {
+  try {
+    const { academicYear } = req.body;
+    
+    if (!academicYear) {
+      return res.status(400).json({ status: 'error', message: 'Academic year is required' });
+    }
+
+    const result = await Project.updateMany(
+      { status: 'Completed', isArchived: false },
+      { $set: { isArchived: true, academicYear } }
+    );
+
+    res.json({
+      status: 'success',
+      message: `${result.modifiedCount} completed projects archived under ${academicYear}`,
+      data: { archivedCount: result.modifiedCount }
+    });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
 // Get all project titles
 export const getAllProjects = async (req, res) => {
   try {
-    const { status, approvalStatus } = req.query;
+    const { status, approvalStatus, isArchived } = req.query;
 
     const filter = {};
     if (status) filter.status = status;
     if (approvalStatus) filter.approvalStatus = approvalStatus;
+    
+    if (isArchived === 'true') filter.isArchived = true;
+    else filter.isArchived = { $ne: true };
 
     const projects = await Project.find(filter)
       .populate('studentId', 'name email rollNumber department')
@@ -367,6 +397,9 @@ export const getAnalytics = async (req, res) => {
     // Projects by status
     const projectsByStatus = await Project.aggregate([
       {
+        $match: { isArchived: { $ne: true } }
+      },
+      {
         $group: {
           _id: '$status',
           count: { $sum: 1 }
@@ -376,6 +409,9 @@ export const getAnalytics = async (req, res) => {
 
     // Projects by approval status
     const projectsByApproval = await Project.aggregate([
+      {
+        $match: { isArchived: { $ne: true } }
+      },
       {
         $group: {
           _id: '$approvalStatus',
@@ -397,7 +433,7 @@ export const getAnalytics = async (req, res) => {
     // Staff workload
     const staffWorkload = await Project.aggregate([
       {
-        $match: { assignedGuideId: { $ne: null } }
+        $match: { assignedGuideId: { $ne: null }, isArchived: { $ne: true } }
       },
       {
         $group: {
