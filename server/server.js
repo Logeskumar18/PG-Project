@@ -11,6 +11,7 @@ import studentRoutes from './routes/studentRoutes.js';
 import marksRoutes from './routes/marks.js';
 import activityRoutes from './routes/activityRoutes.js';
 import deadlineRoutes from './routes/deadlineRoutes.js';
+import publicRoutes from './routes/publicRoutes.js';
 
 // Load environment variables
 dotenv.config();
@@ -42,6 +43,7 @@ app.use('/api/student', studentRoutes);
 app.use('/api/marks', marksRoutes);
 app.use('/api/activities', activityRoutes);
 app.use('/api/deadlines', deadlineRoutes);
+app.use('/api/public', publicRoutes);
 
 // Health check route
 app.get('/api/health', (req, res) => {

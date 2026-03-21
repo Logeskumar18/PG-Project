@@ -4,6 +4,11 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge, Table } from 'react-bootstrap';
 import api from '../services/api';
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 const StaffDashboard = () => {
   const { user, logout } = useAuth();
@@ -112,6 +117,31 @@ const StaffDashboard = () => {
     remarks: ''
   });
   const [selectedProjectForMarks, setSelectedProjectForMarks] = useState(null);
+
+  // PDF Viewer State
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [numPages, setNumPages] = useState(null);
+  const [pageNumber, setPageNumber] = useState(1);
+
+  const onDocumentLoadSuccess = ({ numPages }) => {
+    setNumPages(numPages);
+    setPageNumber(1);
+  };
+
+  const handleViewPdf = (doc) => {
+    const url = (doc.cloudinaryUrl || doc.fileUrl || doc.url) 
+      ? (doc.cloudinaryUrl || doc.fileUrl || doc.url) 
+      : (api.defaults?.baseURL ? `${api.defaults.baseURL.replace(/\/$/, '')}/staff/documents/${doc._id || doc.id}/download` : `/api/staff/documents/${doc._id || doc.id}/download`);
+    
+    // If it's a PDF file, open the in-app viewer. Otherwise fallback to standard new tab viewing/download.
+    if (doc.fileName?.toLowerCase().endsWith('.pdf') || doc.type?.toLowerCase() === 'pdf') {
+      setPdfUrl(url);
+      setShowPdfModal(true);
+    } else {
+      window.open(url, '_blank');
+    }
+  };
 
   const STAGES = ['Proposal Submitted', 'Proposal Approved', 'Development', 'Mid Review', 'Testing', 'Final Submission'];
 
@@ -835,25 +865,14 @@ const StaffDashboard = () => {
                           <td className="text-muted small" style={{maxWidth: '250px', whiteSpace: 'normal'}}>{doc.remarks || '—'}</td>
                           <td>{doc.uploadedAt ? new Date(doc.uploadedAt).toLocaleDateString() : '—'}</td>
                           <td>
-                            {(doc.cloudinaryUrl || doc.fileUrl || doc.url) ? (
-                              <Button
-                                variant="outline-success"
-                                size="sm"
-                                className="me-2"
-                                onClick={() => window.open(doc.cloudinaryUrl || doc.fileUrl || doc.url, '_blank')}
-                              >
-                                View
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="outline-success"
-                                size="sm"
-                                className="me-2"
-                                onClick={() => window.open(api.defaults?.baseURL ? `${api.defaults.baseURL.replace(/\/$/, '')}/staff/documents/${doc._id || doc.id}/download` : `/api/staff/documents/${doc._id || doc.id}/download`, '_blank')}
-                              >
-                                View
-                              </Button>
-                            )}
+                            <Button
+                              variant="outline-success"
+                              size="sm"
+                              className="me-2"
+                              onClick={() => handleViewPdf(doc)}
+                            >
+                              View
+                            </Button>
                             {(doc.reviewStatus === 'Pending' || doc.status === 'Pending' || !doc.reviewStatus && !doc.status) && (
                               <>
                                 <Button
@@ -1433,6 +1452,48 @@ const StaffDashboard = () => {
           <Button variant="primary" onClick={submitMarks} disabled={totalMarks > 40}>
             Submit Marks
           </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* PDF Viewer Modal */}
+      <Modal show={showPdfModal} onHide={() => setShowPdfModal(false)} size="xl" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Document Viewer</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="d-flex flex-column align-items-center bg-light overflow-auto" style={{ maxHeight: '75vh' }}>
+          {pdfUrl ? (
+            <Document
+              file={pdfUrl}
+              onLoadSuccess={onDocumentLoadSuccess}
+              loading={<div className="p-5 text-muted">Loading PDF...</div>}
+              error={<div className="p-5 text-danger text-center">Failed to load PDF. Please ensure the URL is correct and CORS is allowed.<br/><br/><a href={pdfUrl} target="_blank" rel="noreferrer" className="btn btn-outline-primary btn-sm">Click here to download/view instead</a></div>}
+            >
+              <Page 
+                pageNumber={pageNumber} 
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+                className="shadow-sm mb-3 bg-white" 
+                width={800}
+              />
+            </Document>
+          ) : (
+            <div className="p-5 text-muted">No document selected</div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="d-flex justify-content-between w-100">
+          <div className="d-flex align-items-center gap-3">
+            <Button variant="outline-primary" size="sm" disabled={pageNumber <= 1} onClick={() => setPageNumber(prev => prev - 1)}>
+              Previous
+            </Button>
+            <span className="fw-semibold">Page {pageNumber} of {numPages || '--'}</span>
+            <Button variant="outline-primary" size="sm" disabled={pageNumber >= (numPages || 1)} onClick={() => setPageNumber(prev => prev + 1)}>
+              Next
+            </Button>
+          </div>
+          <div className="d-flex gap-2">
+            <Button variant="outline-secondary" onClick={() => window.open(pdfUrl, '_blank')}>Open in New Tab</Button>
+            <Button variant="secondary" onClick={() => setShowPdfModal(false)}>Close</Button>
+          </div>
         </Modal.Footer>
       </Modal>
 

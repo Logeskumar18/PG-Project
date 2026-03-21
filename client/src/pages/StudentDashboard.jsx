@@ -8,6 +8,11 @@ import ProjectForm from '../components/ProjectForm.jsx';
 import api from '../services/api';
 import downloadPDF from '../utils/downloadPDF';
 import html2pdf from 'html2pdf.js'; // Ensure this import for Vite/React
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
 
 const StudentDashboard = () => {
@@ -45,6 +50,34 @@ const StudentDashboard = () => {
   
   const [meetings, setMeetings] = useState([]);
   const [showMeetingModal, setShowMeetingModal] = useState(false);
+
+  // Document Search & Filter State
+  const [docSearchQuery, setDocSearchQuery] = useState('');
+  const [docFilterStatus, setDocFilterStatus] = useState('All');
+
+  // PDF Viewer State
+  const [showPdfModal, setShowPdfModal] = useState(false);
+  const [pdfUrl, setPdfUrl] = useState(null);
+  const [numPages, setNumPages] = useState(null);
+  const [pageNumber, setPageNumber] = useState(1);
+
+  const onDocumentLoadSuccess = ({ numPages }) => {
+    setNumPages(numPages);
+    setPageNumber(1);
+  };
+
+  const handleViewPdf = (doc) => {
+    const url = (doc.cloudinaryUrl || doc.fileUrl || doc.url) 
+      ? (doc.cloudinaryUrl || doc.fileUrl || doc.url) 
+      : (api.defaults?.baseURL ? `${api.defaults.baseURL.replace(/\/$/, '')}/student/documents/${doc._id || doc.id}/download` : `/api/student/documents/${doc._id || doc.id}/download`);
+    
+    if (doc.fileName?.toLowerCase().endsWith('.pdf') || doc.type?.toLowerCase() === 'pdf') {
+      setPdfUrl(url);
+      setShowPdfModal(true);
+    } else {
+      window.open(url, '_blank');
+    }
+  };
 
   // Fetch announcements and projects
   const fetchAnnouncements = async () => {
@@ -387,6 +420,14 @@ const StudentDashboard = () => {
   const handleCancelLogout = () => {
     setShowLogoutModal(false);
   };
+
+  const filteredDocuments = documents.filter(doc => {
+    const matchesSearch = (doc.fileName || '').toLowerCase().includes(docSearchQuery.toLowerCase()) || 
+                          (doc.type || '').toLowerCase().includes(docSearchQuery.toLowerCase());
+    const status = doc.reviewStatus || 'Pending';
+    const matchesStatus = docFilterStatus === 'All' || status === docFilterStatus;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
     <div className="min-vh-100" style={{ background: '#f8f9fa' }}>
@@ -757,14 +798,40 @@ const StudentDashboard = () => {
                       🔄 Refresh
                     </Button>
                   </div>
-                  {documents.length === 0 ? (
+
+                    {/* Search and Filter */}
+                    {documents.length > 0 && (
+                      <Row className="mb-3 g-2">
+                        <Col md={7}>
+                          <Form.Control 
+                            type="text" 
+                            placeholder="Search by file name or type..." 
+                            value={docSearchQuery}
+                            onChange={(e) => setDocSearchQuery(e.target.value)}
+                          />
+                        </Col>
+                        <Col md={5}>
+                          <Form.Select 
+                            value={docFilterStatus}
+                            onChange={(e) => setDocFilterStatus(e.target.value)}
+                          >
+                            <option value="All">All Statuses</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                          </Form.Select>
+                        </Col>
+                      </Row>
+                    )}
+
+                    {filteredDocuments.length === 0 ? (
                     <div className="text-center py-5 text-muted">
-                      <p className="mb-0">No submissions yet</p>
-                      <small>Upload documents to track them here</small>
+                        <p className="mb-0">{documents.length === 0 ? 'No submissions yet' : 'No matching documents found'}</p>
+                        <small>{documents.length === 0 ? 'Upload documents to track them here' : 'Try adjusting your search or filters'}</small>
                     </div>
                   ) : (
                     <div className="d-flex flex-column gap-3">
-                      {documents.map((doc) => (
+                        {filteredDocuments.map((doc) => (
                         <div key={doc._id} className="p-3 bg-light rounded-3">
                           <div className="d-flex justify-content-between mb-2">
                             <strong>{doc.fileName}</strong>
@@ -776,11 +843,14 @@ const StudentDashboard = () => {
                           <small className="text-muted d-block">Uploaded: {new Date(doc.uploadedAt).toLocaleDateString()}</small>
                           {doc.remarks && <small className="d-block mt-2 text-dark"><strong>Staff Remarks:</strong> {doc.remarks}</small>}
                           <div className="mt-2">
-                            {(doc.fileUrl || doc.url) ? (
-                              <a href={doc.fileUrl || doc.url} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm me-2">Download</a>
-                            ) : (
-                              <a href={api.defaults?.baseURL ? `${api.defaults.baseURL.replace(/\/$/, '')}/student/documents/${doc._id}/download` : `/api/student/documents/${doc._id}/download`} target="_blank" rel="noopener noreferrer" className="btn btn-outline-primary btn-sm me-2">Download</a>
-                            )}
+                            <Button
+                              variant="outline-primary"
+                              size="sm"
+                              className="me-2"
+                              onClick={() => handleViewPdf(doc)}
+                            >
+                              View
+                            </Button>
                           </div>
                         </div>
                       ))}
@@ -1407,6 +1477,48 @@ const StudentDashboard = () => {
             }}
           />
         </Modal.Body>
+      </Modal>
+
+      {/* PDF Viewer Modal */}
+      <Modal show={showPdfModal} onHide={() => setShowPdfModal(false)} size="xl" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Document Viewer</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="d-flex flex-column align-items-center bg-light overflow-auto" style={{ maxHeight: '75vh' }}>
+          {pdfUrl ? (
+            <Document
+              file={pdfUrl}
+              onLoadSuccess={onDocumentLoadSuccess}
+              loading={<div className="p-5 text-muted">Loading PDF...</div>}
+              error={<div className="p-5 text-danger text-center">Failed to load PDF. Please ensure the URL is correct and CORS is allowed.<br/><br/><a href={pdfUrl} target="_blank" rel="noreferrer" className="btn btn-outline-primary btn-sm">Click here to download/view instead</a></div>}
+            >
+              <Page 
+                pageNumber={pageNumber} 
+                renderTextLayer={true}
+                renderAnnotationLayer={true}
+                className="shadow-sm mb-3 bg-white" 
+                width={800}
+              />
+            </Document>
+          ) : (
+            <div className="p-5 text-muted">No document selected</div>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="d-flex justify-content-between w-100">
+          <div className="d-flex align-items-center gap-3">
+            <Button variant="outline-primary" size="sm" disabled={pageNumber <= 1} onClick={() => setPageNumber(prev => prev - 1)}>
+              Previous
+            </Button>
+            <span className="fw-semibold">Page {pageNumber} of {numPages || '--'}</span>
+            <Button variant="outline-primary" size="sm" disabled={pageNumber >= (numPages || 1)} onClick={() => setPageNumber(prev => prev + 1)}>
+              Next
+            </Button>
+          </div>
+          <div className="d-flex gap-2">
+            <Button variant="outline-secondary" onClick={() => window.open(pdfUrl, '_blank')}>Open in New Tab</Button>
+            <Button variant="secondary" onClick={() => setShowPdfModal(false)}>Close</Button>
+          </div>
+        </Modal.Footer>
       </Modal>
     </div>
   );

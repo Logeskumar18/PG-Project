@@ -1,7 +1,26 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Container, Row, Col, Card, Button, Navbar, Nav, Dropdown } from 'react-bootstrap';
+import { Container, Row, Col, Card, Button, Navbar, Nav, Dropdown, Badge } from 'react-bootstrap';
+import api from '../services/api';
 
 const Home = () => {
+  const [topProjects, setTopProjects] = useState([]);
+
+  useEffect(() => {
+    const fetchShowcase = async () => {
+      try {
+        // Assuming your backend exposes an endpoint for public showcase
+        const response = await api.get('/public/showcase');
+        if (response.data && response.data.data) {
+          setTopProjects(response.data.data);
+        }
+      } catch (error) {
+        console.error('Error fetching showcase projects:', error);
+      }
+    };
+    fetchShowcase();
+  }, []);
+
   return (
     <div className="min-vh-100" style={{background: '#f8f9fa'}}>
       {/* Navigation Bar */}
@@ -14,6 +33,7 @@ const Home = () => {
           <Navbar.Collapse id="basic-navbar-nav">
             <Nav className="ms-auto gap-3 align-items-lg-center">
               <Nav.Link href="#features" className="fw-semibold">Features</Nav.Link>
+              <Nav.Link href="#showcase" className="fw-semibold">Showcase</Nav.Link>
               <Nav.Link href="#roles" className="fw-semibold">Access Portal</Nav.Link>
               <Nav.Link href="#about" className="fw-semibold">About</Nav.Link>
               <Dropdown>
@@ -189,6 +209,48 @@ const Home = () => {
           </Col>
         </Row>
       </Container>
+
+      {/* Showcase Section */}
+      {topProjects.length > 0 && (
+        <Container className="py-5" id="showcase">
+          <div className="text-center mb-5">
+            <h2 className="display-5 fw-bold mb-3">Project Showcase</h2>
+            <p className="text-muted fs-5">Highlighting the highest-graded projects of the year</p>
+          </div>
+          <Row className="g-4">
+            {topProjects.map((project) => (
+              <Col md={6} lg={4} key={project._id}>
+                <Card className="h-100 border-0 shadow-sm rounded-4 overflow-hidden" style={{ transition: 'transform 0.3s, box-shadow 0.3s' }} onMouseEnter={(e) => { e.currentTarget.style.transform = 'translateY(-5px)'; e.currentTarget.style.boxShadow = '0 10px 20px rgba(0,0,0,0.1)'; }} onMouseLeave={(e) => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 .125rem .25rem rgba(0,0,0,.075)'; }}>
+                  <div style={{height: '6px', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)'}}></div>
+                  <Card.Body className="p-4 d-flex flex-column">
+                    <div className="d-flex justify-content-between align-items-start mb-3">
+                      <Badge bg="success" className="px-3 py-2 rounded-pill">Top Project</Badge>
+                      <span className="text-muted small">{project.academicYear || new Date().getFullYear()}</span>
+                    </div>
+                    <h5 className="fw-bold mb-3">{project.title}</h5>
+                    <p className="text-muted mb-4 flex-grow-1" style={{ display: '-webkit-box', WebkitLineClamp: 3, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {project.description}
+                    </p>
+                    <div className="mt-auto">
+                      <hr className="my-3" />
+                      <div className="d-flex justify-content-between align-items-center">
+                        <div>
+                          <small className="text-muted d-block">Department</small>
+                          <span className="fw-semibold">{project.studentId?.department || 'Computer Science'}</span>
+                        </div>
+                        <div className="text-end">
+                          <small className="text-muted d-block">Student</small>
+                          <span className="fw-semibold">{project.studentId?.name || 'Anonymous'}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </Card.Body>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </Container>
+      )}
 
       {/* Role-based Access Section */}
       <div className="py-5" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} id="roles">
