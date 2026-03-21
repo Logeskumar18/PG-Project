@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect } from '../middleware/authMiddleware.js';
-import { createProject, getMyProject, updateMyProject, uploadDocument, getMyDocuments, getMyMilestones, submitProgress, updateMilestoneStatus, downloadDocument, upload as fileUpload, requestMeeting, getMyMeetings } from '../controllers/studentProjectController.js';
+import { createProject, getMyProject, updateMyProject, uploadDocument, getMyDocuments, getMyMilestones, submitProgress, updateMilestoneStatus, downloadDocument, upload as fileUpload, requestMeeting, getMyMeetings, changePassword } from '../controllers/studentProjectController.js';
 
 
 const router = express.Router();
@@ -27,5 +27,8 @@ router.post('/progress', protect, submitProgress);
 // Student meeting endpoints
 router.post('/meetings', protect, requestMeeting);
 router.get('/meetings/my', protect, getMyMeetings);
+
+// Student password management endpoints
+router.put('/change-password', protect, changePassword);
 
 export default router;

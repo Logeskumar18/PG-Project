@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import ConfirmLogoutModal from '../components/ConfirmLogoutModal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge, Table } from 'react-bootstrap';
 import api from '../services/api';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -12,6 +13,7 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 const StaffDashboard = () => {
   const { user, logout } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [successMessage, setSuccessMessage] = useState('');
@@ -33,6 +35,7 @@ const StaffDashboard = () => {
   const [progressUpdates, setProgressUpdates] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
   const [meetings, setMeetings] = useState([]);
+  const [hods, setHods] = useState([]);
 
   // Fetch staff-scoped data
   const fetchData = async () => {
@@ -40,14 +43,15 @@ const StaffDashboard = () => {
       setLoadingData(true);
       // announcements
       setLoadingAnnouncements(true);
-      const [annRes, studentsRes, projectsRes, docsRes, progressRes, messagesRes, meetingsRes] = await Promise.all([
+      const [annRes, studentsRes, projectsRes, docsRes, progressRes, messagesRes, meetingsRes, hodsRes] = await Promise.all([
         api.get('/communication/announcements'),
         api.get('/staff/students'),
         api.get('/staff/projects'),
         api.get('/staff/documents'),
         api.get('/staff/progress'),
         api.get('/communication/messages/inbox'),
-        api.get('/staff/meetings').catch(() => ({ data: { data: [] } }))
+        api.get('/staff/meetings').catch(() => ({ data: { data: [] } })),
+        api.get('/staff/hods').catch(() => ({ data: { data: [] } }))
       ]);
 
       if (annRes.data.data) setAnnouncements(annRes.data.data);
@@ -59,6 +63,7 @@ const StaffDashboard = () => {
       if (progressRes.data.data) setProgressUpdates(progressRes.data.data);
       if (messagesRes.data.data) setMessages(messagesRes.data.data);
       if (meetingsRes?.data?.data) setMeetings(meetingsRes.data.data);
+      if (hodsRes?.data?.data) setHods(hodsRes.data.data);
 
       const deadlinesRes = await api.get('/deadlines');
       if (deadlinesRes.data?.data) {
@@ -106,6 +111,73 @@ const StaffDashboard = () => {
   const [showStudentProfileModal, setShowStudentProfileModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
 
+  // Profile Management States
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [showModernSuccess, setShowModernSuccess] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: user?.name || '',
+    department: user?.department || '',
+    phone: user?.phone || ''
+  });
+
+  const handleProfileUpdate = async (e) => {
+    e.preventDefault();
+    setProfileLoading(true);
+    try {
+      await api.put('/staff/update-profile', {
+        name: profileForm.name,
+        department: profileForm.department,
+        phone: profileForm.phone
+      });
+      setShowEditProfileModal(false);
+      setShowModernSuccess(true);
+    } catch (error) {
+      setErrorMessage('Failed to update profile');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+    
+    const passwordRegex = /^(?=.*[0-9])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]{6,}$/;
+    if (!passwordRegex.test(passwordForm.newPassword)) {
+      setPasswordError('Password must be at least 6 characters, include a number and a special character.');
+      return;
+    }
+    
+    setPasswordLoading(true);
+    try {
+      await api.put('/staff/change-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      });
+      setShowChangePasswordModal(false);
+      setShowModernSuccess(true);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      setPasswordError(error.response?.data?.message || 'Failed to change password');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   // Marks State
   const [showMarksModal, setShowMarksModal] = useState(false);
   const [marksData, setMarksData] = useState({
@@ -140,6 +212,54 @@ const StaffDashboard = () => {
       setShowPdfModal(true);
     } else {
       window.open(url, '_blank');
+    }
+  };
+
+  // Reply Modal State
+  const [showReplyModal, setShowReplyModal] = useState(false);
+  const [replyToMessage, setReplyToMessage] = useState(null);
+  const [replySubject, setReplySubject] = useState('');
+  const [replyContent, setReplyContent] = useState('');
+  const [replyLoading, setReplyLoading] = useState(false);
+
+  const handleReply = (message) => {
+    setReplyToMessage(message);
+    setReplySubject(`Re: ${message.subject}`);
+    setReplyContent('');
+    setShowReplyModal(true);
+  };
+
+  const handleSendReply = async (e) => {
+    e.preventDefault();
+    if (!replyContent.trim()) return;
+    try {
+      setReplyLoading(true);
+      const receiverId = replyToMessage.senderId?._id || replyToMessage.senderId;
+      await api.post('/communication/messages', {
+        receiverId: receiverId,
+        subject: replySubject,
+        message: replyContent
+      });
+      setSuccessMessage('Reply sent successfully!');
+      setShowReplyModal(false);
+      await fetchMessages();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      setErrorMessage('Error sending reply: ' + (error.response?.data?.message || error.message));
+    } finally {
+      setReplyLoading(false);
+    }
+  };
+
+  const handleMarkAsRead = async (messageId) => {
+    try {
+      setMessages(messages.map(msg => 
+        msg._id === messageId ? { ...msg, isRead: true } : msg
+      ));
+      await api.put(`/communication/messages/${messageId}/read`);
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+      fetchMessages(); // Revert on failure
     }
   };
 
@@ -440,18 +560,33 @@ const StaffDashboard = () => {
   const pendingCount = projects.filter(p => (p.approvalStatus || p.approval) === 'Pending').length;
   const approvedCount = projects.filter(p => (p.approvalStatus || p.approval) === 'Approved').length;
   const pendingDocReviews = documents.filter(d => (d.reviewStatus || d.status) === 'Pending').length;
+  const unreadMessagesCount = messages.filter(m => !m.isRead).length;
 
   return (
-    <div className="min-vh-100" style={{ background: '#f8f9fa' }}>
+    <div className={`min-vh-100 ${theme === 'dark' ? 'bg-dark text-light' : 'bg-light text-dark'}`} style={theme === 'dark' ? { background: '#121212' } : { background: '#f8f9fa' }}>
+      <style>
+        {`
+          @keyframes slideUpFade {
+            from { opacity: 0; transform: translateY(30px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .profile-card-animate {
+            animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+          }
+        `}
+      </style>
       {/* Navbar */}
-      <div className="bg-white shadow-sm py-3 sticky-top">
+      <div className={`shadow-sm py-3 sticky-top ${theme === 'dark' ? 'bg-dark border-bottom border-secondary' : 'bg-white'}`}>
         <Container fluid className="px-4">
           <div className="d-flex justify-content-between align-items-center">
             <div>
               <h4 className="fw-bold mb-0" style={{ color: '#4facfe' }}>👨‍🏫 Staff Dashboard</h4>
-              <small className="text-muted">Welcome, {user?.name}</small>
+              <small className={theme === 'dark' ? 'text-light' : 'text-muted'}>Welcome, {user?.name}</small>
             </div>
-            <Button variant="danger" size="sm" onClick={handleLogoutClick}>Logout</Button>
+            <div className="d-flex align-items-center gap-3">
+              <Button variant={theme === 'dark' ? 'outline-light' : 'outline-dark'} size="sm" onClick={toggleTheme} className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px', padding: 0 }}>{theme === 'dark' ? '☀️' : '🌙'}</Button>
+              <Button variant="danger" size="sm" onClick={handleLogoutClick}>Logout</Button>
+            </div>
                 <ConfirmLogoutModal
                   show={showLogoutModal}
                   onConfirm={handleConfirmLogout}
@@ -535,9 +670,19 @@ const StaffDashboard = () => {
           <Button
             variant={activeTab === 'messages' ? 'primary' : 'light'}
             onClick={() => setActiveTab('messages')}
-            className="fw-semibold"
+            className="fw-semibold position-relative"
           >
             💬 Messages
+            {unreadMessagesCount > 0 && (
+              <Badge 
+                bg="danger" 
+                pill 
+                className="position-absolute top-0 start-100 translate-middle"
+                style={{ fontSize: '0.65rem' }}
+              >
+                {unreadMessagesCount}
+              </Badge>
+            )}
           </Button>
           <Button
             variant={activeTab === 'announcements' ? 'primary' : 'light'}
@@ -546,7 +691,131 @@ const StaffDashboard = () => {
           >
             📢 Announcements
           </Button>
+          <Button
+            variant={activeTab === 'profile' ? 'primary' : 'light'}
+            onClick={() => setActiveTab('profile')}
+            className="fw-semibold"
+          >
+            👤 My Profile
+          </Button>
         </div>
+
+        {/* My Profile Tab */}
+        {activeTab === 'profile' && (
+          <Row className="g-4 profile-card-animate">
+            <Col lg={4}>
+              <Card className="border-0 shadow-sm rounded-4 overflow-hidden h-100">
+                <div style={{ height: '120px', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}></div>
+                <Card.Body className="p-4 text-center position-relative pb-5">
+                  <div 
+                    className="rounded-circle bg-white d-flex align-items-center justify-content-center shadow-sm" 
+                    style={{ width: '100px', height: '100px', margin: '-70px auto 15px', border: '4px solid white', fontSize: '3rem' }}
+                  >
+                    👨‍🏫
+                  </div>
+                  <h4 className="fw-bold mb-1" style={{ color: '#2d3748' }}>{user?.name || 'Staff Name'}</h4>
+                  <p className="text-muted mb-3">{user?.role || 'Staff Member'}</p>
+                  
+                  <div className="d-flex justify-content-center gap-2 mb-4">
+                    <Badge bg="info" className="px-3 py-2 rounded-pill fw-normal text-dark">{user?.department || 'Department'}</Badge>
+                  </div>
+
+                  <Button 
+                    variant="primary" 
+                    className="w-100 py-2 fw-semibold rounded-pill shadow-sm mb-3"
+                    onClick={() => { setProfileForm({ name: user?.name || '', department: user?.department || '', phone: user?.phone || '' }); setShowEditProfileModal(true); }}
+                    style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', border: 'none' }}
+                  >
+                    ✏️ Edit Profile
+                  </Button>
+                  <Button 
+                    variant="outline-secondary" 
+                    className="w-100 py-2 fw-semibold rounded-pill shadow-sm"
+                    onClick={() => setShowChangePasswordModal(true)}
+                  >
+                    🔒 Change Password
+                  </Button>
+                </Card.Body>
+              </Card>
+            </Col>
+            
+            <Col lg={8}>
+              <Card className="border-0 shadow-sm rounded-4 h-100">
+                <Card.Body className="p-4 p-md-5">
+                  <h5 className="fw-bold mb-4 pb-2 border-bottom">Personal Information</h5>
+                  <Row className="g-4 mb-5">
+                    <Col md={6}>
+                      <div className="d-flex align-items-start gap-3">
+                        <div className="p-2 bg-light rounded-3 text-primary" style={{color: '#4facfe'}}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        </div>
+                        <div>
+                          <small className="text-muted d-block fw-semibold mb-1">Email Address</small>
+                          <span className="fs-6 text-dark">{user?.email || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </Col>
+                    <Col md={6}>
+                      <div className="d-flex align-items-start gap-3">
+                        <div className="p-2 bg-light rounded-3 text-primary" style={{color: '#4facfe'}}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                        </div>
+                        <div>
+                          <small className="text-muted d-block fw-semibold mb-1">Phone Number</small>
+                          <span className="fs-6 text-dark">{user?.phone || 'Not provided'}</span>
+                        </div>
+                      </div>
+                    </Col>
+                    <Col md={6}>
+                      <div className="d-flex align-items-start gap-3">
+                        <div className="p-2 bg-light rounded-3 text-primary" style={{color: '#4facfe'}}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                        </div>
+                        <div>
+                          <small className="text-muted d-block fw-semibold mb-1">Department</small>
+                          <span className="fs-6 text-dark">{user?.department || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </Col>
+                    <Col md={6}>
+                      <div className="d-flex align-items-start gap-3">
+                        <div className="p-2 bg-light rounded-3 text-primary" style={{color: '#4facfe'}}>
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        </div>
+                        <div>
+                          <small className="text-muted d-block fw-semibold mb-1">Joined</small>
+                          <span className="fs-6 text-dark">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Recently'}</span>
+                        </div>
+                      </div>
+                    </Col>
+                  </Row>
+
+                  <h5 className="fw-bold mb-4 pb-2 border-bottom">Overview Statistics</h5>
+                  <Row className="g-3">
+                    <Col sm={4}>
+                      <div className="p-3 bg-light rounded-3 text-center border">
+                        <h3 className="fw-bold text-primary mb-1">{assignedStudents.length}</h3>
+                        <small className="text-muted fw-semibold">Students</small>
+                      </div>
+                    </Col>
+                    <Col sm={4}>
+                      <div className="p-3 bg-light rounded-3 text-center border">
+                        <h3 className="fw-bold text-success mb-1">{projects.length}</h3>
+                        <small className="text-muted fw-semibold">Projects</small>
+                      </div>
+                    </Col>
+                    <Col sm={4}>
+                      <div className="p-3 bg-light rounded-3 text-center border">
+                        <h3 className="fw-bold text-warning mb-1">{documents.length}</h3>
+                        <small className="text-muted fw-semibold">Docs Reviewed</small>
+                      </div>
+                    </Col>
+                  </Row>
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        )}
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
@@ -613,6 +882,29 @@ const StaffDashboard = () => {
                 </Card>
               </Col>
             )}
+
+            {/* Quick Action: Message HOD */}
+            <Col lg={12}>
+              <Card className="border-0 shadow-sm border-start border-5 border-primary bg-white">
+                <Card.Body className="p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                  <div>
+                    <h5 className="fw-bold mb-1">Contact Department Head</h5>
+                    <p className="text-muted mb-0">Send a direct message to the HOD for administrative requests or urgent queries.</p>
+                  </div>
+                  <Button 
+                    variant="primary" 
+                    className="fw-semibold px-4 py-2"
+                    style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', border: 'none' }}
+                    onClick={() => {
+                      if (hods.length > 0) setMessageReceiver(hods[0]._id || hods[0].userId);
+                      setShowComposeModal(true);
+                    }}
+                  >
+                    ✉️ Message HOD
+                  </Button>
+                </Card.Body>
+              </Card>
+            </Col>
 
             <Col lg={12}>
               <Card className="border-0 shadow-sm">
@@ -1245,22 +1537,55 @@ const StaffDashboard = () => {
                   ) : messages.length === 0 ? (
                     <div className="text-center text-muted py-4">No messages yet</div>
                   ) : (
-                    <div className="d-flex flex-column gap-3">
+                    <div className="d-flex flex-column">
                       {messages.map(message => (
-                        <div key={message._id} className="p-3 border rounded-3">
-                          <div className="d-flex justify-content-between align-items-start">
+                        <div 
+                          key={message._id} 
+                          className={`p-4 border rounded-4 mb-3 transition-all ${!message.isRead ? 'bg-white border-primary shadow-sm' : 'bg-light border-0 shadow-sm'}`}
+                          style={{ transition: 'all 0.3s ease' }}
+                        >
+                          <div className="d-flex justify-content-between align-items-start gap-3">
+                            <div className="d-flex align-items-center justify-content-center rounded-circle text-white flex-shrink-0 shadow-sm" style={{ width: '48px', height: '48px', fontSize: '1.2rem', fontWeight: 'bold', background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)' }}>
+                              {(message.senderId?.name || 'U').charAt(0).toUpperCase()}
+                            </div>
                             <div className="flex-grow-1">
-                              <h6 className="fw-bold mb-2">{message.subject}</h6>
-                              <p className="text-muted mb-2">{message.message}</p>
-                              <div className="d-flex gap-3 align-items-center">
-                                <small className="text-muted">
-                                  From: {message.senderId?.name} ({message.senderId?.role})
+                              <div className="d-flex justify-content-between align-items-center mb-1">
+                                <div className="d-flex align-items-center gap-2">
+                                  <h6 className="mb-0 fw-bold text-dark">{message.senderId?.name || 'Unknown'}</h6>
+                                  <Badge bg="secondary" pill className="fw-normal" style={{ fontSize: '0.7rem' }}>{message.senderId?.role || 'User'}</Badge>
+                                  {!message.isRead && <Badge bg="danger" pill style={{ fontSize: '0.65rem' }}>New</Badge>}
+                                </div>
+                                <small className="text-muted fw-semibold">
+                                  {new Date(message.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
                                 </small>
-                                <small className="text-muted">
-                                  {new Date(message.createdAt).toLocaleDateString()}
-                                </small>
-                                {!message.isRead && <Badge bg="primary">New</Badge>}
                               </div>
+                              <h6 className={`mb-3 mt-2 ${!message.isRead ? 'fw-bold text-dark' : 'fw-semibold text-secondary'}`}>
+                                {message.subject}
+                              </h6>
+                              <div className="p-3 bg-white rounded-3 border text-secondary shadow-sm" style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem' }}>
+                                {message.message}
+                              </div>
+                            </div>
+                          <div className="flex-shrink-0 d-flex gap-2">
+                            {!message.isRead && (
+                              <Button
+                                variant="outline-success"
+                                size="sm"
+                                className="rounded-pill px-3 shadow-sm fw-semibold"
+                                onClick={() => handleMarkAsRead(message._id)}
+                              >
+                                ✔️ Mark Read
+                              </Button>
+                            )}
+                              <Button
+                                variant={!message.isRead ? 'primary' : 'outline-primary'}
+                                size="sm"
+                                className="rounded-pill px-3 shadow-sm fw-semibold"
+                                onClick={() => handleReply(message)}
+                                style={!message.isRead ? { background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', border: 'none' } : {}}
+                              >
+                                ↩️ Reply
+                              </Button>
                             </div>
                           </div>
                         </div>
@@ -1314,39 +1639,52 @@ const StaffDashboard = () => {
       </Container>
 
       {/* Compose Message Modal */}
-      <Modal show={showComposeModal} onHide={() => setShowComposeModal(false)} size="lg" centered>
-        <Modal.Header closeButton>
-          <Modal.Title>✉️ Compose Message</Modal.Title>
+      <Modal show={showComposeModal} onHide={() => setShowComposeModal(false)} size="lg" centered className="border-0">
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">✉️ Compose Message</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body className="pt-2">
           <Form onSubmit={handleSendMessage}>
             <Form.Group className="mb-3">
-              <Form.Label>Recipient *</Form.Label>
+              <Form.Label className="fw-semibold text-muted small text-uppercase">Recipient *</Form.Label>
               <Form.Select
                 value={messageReceiver}
                 onChange={(e) => setMessageReceiver(e.target.value)}
                 required
+                className="py-2 rounded-3"
               >
-                <option value="">Select a student...</option>
-                {assignedStudents.map(student => (
-                  <option key={student._id || student.id} value={student.userId || student._id}>
-                    {student.name} ({student.studentId || student.email})
-                  </option>
-                ))}
+                <option value="">Select a recipient...</option>
+                {hods.length > 0 && (
+                  <optgroup label="HODs">
+                    {hods.map(hod => (
+                      <option key={hod._id || hod.id} value={hod.userId || hod._id}>
+                        {hod.name} (HOD)
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="Students">
+                  {assignedStudents.map(student => (
+                    <option key={student._id || student.id} value={student.userId || student._id}>
+                      {student.name} ({student.studentId || student.email})
+                    </option>
+                  ))}
+                </optgroup>
               </Form.Select>
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Subject *</Form.Label>
+              <Form.Label className="fw-semibold text-muted small text-uppercase">Subject *</Form.Label>
               <Form.Control
                 type="text"
                 placeholder="Enter message subject"
                 value={messageSubject}
                 onChange={(e) => setMessageSubject(e.target.value)}
                 required
+                className="py-2 rounded-3"
               />
             </Form.Group>
             <Form.Group className="mb-4">
-              <Form.Label>Message *</Form.Label>
+              <Form.Label className="fw-semibold text-muted small text-uppercase">Message *</Form.Label>
               <Form.Control
                 as="textarea"
                 rows={5}
@@ -1354,22 +1692,77 @@ const StaffDashboard = () => {
                 value={messageContent}
                 onChange={(e) => setMessageContent(e.target.value)}
                 required
+                className="rounded-3"
               />
             </Form.Group>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="light" onClick={() => setShowComposeModal(false)} className="rounded-pill px-4 fw-semibold shadow-sm">
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                onClick={handleSendMessage}
+                disabled={!messageReceiver || !messageSubject.trim() || !messageContent.trim()}
+                className="rounded-pill px-4 fw-semibold shadow-sm"
+                style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', border: 'none' }}
+              >
+                Send Message
+              </Button>
+            </div>
           </Form>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowComposeModal(false)}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleSendMessage}
-            disabled={!messageReceiver || !messageSubject.trim() || !messageContent.trim()}
-          >
-            Send Message
-          </Button>
-        </Modal.Footer>
+      </Modal>
+
+      {/* Reply Modal */}
+      <Modal show={showReplyModal} onHide={() => setShowReplyModal(false)} centered className="border-0">
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">↩️ Reply to Message</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="pt-2">
+          <Form onSubmit={handleSendReply}>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold text-muted small text-uppercase">To</Form.Label>
+              <Form.Control
+                value={replyToMessage?.senderId?.name || 'Unknown'}
+                disabled
+                className="bg-light border-0 py-2 rounded-3 text-dark fw-semibold"
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold text-muted small text-uppercase">Subject</Form.Label>
+              <Form.Control
+                value={replySubject}
+                onChange={(e) => setReplySubject(e.target.value)}
+                required
+                className="py-2 rounded-3"
+              />
+            </Form.Group>
+            <Form.Group className="mb-4">
+              <Form.Label className="fw-semibold text-muted small text-uppercase">Message</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={5}
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder="Type your reply here..."
+                required
+                className="rounded-3"
+              />
+            </Form.Group>
+            <div className="d-flex gap-2 justify-content-end">
+              <Button variant="light" onClick={() => setShowReplyModal(false)} className="rounded-pill px-4 fw-semibold shadow-sm">Cancel</Button>
+              <Button 
+                type="submit" 
+                variant="primary" 
+                disabled={replyLoading}
+                className="rounded-pill px-4 fw-semibold shadow-sm"
+                style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', border: 'none' }}
+              >
+                {replyLoading ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Sending...</> : 'Send Reply'}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
       </Modal>
 
       {/* Student Profile Modal */}
@@ -1495,6 +1888,114 @@ const StaffDashboard = () => {
             <Button variant="secondary" onClick={() => setShowPdfModal(false)}>Close</Button>
           </div>
         </Modal.Footer>
+      </Modal>
+
+      {/* Profile Edit Modal */}
+      <Modal show={showEditProfileModal} onHide={() => !profileLoading && setShowEditProfileModal(false)} centered backdrop="static">
+        <Modal.Header closeButton={!profileLoading} className="border-0 pb-0">
+          <Modal.Title className="fw-bold">Edit Profile</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleProfileUpdate}>
+            <Form.Group className="mb-3">
+              <Form.Label>Full Name</Form.Label>
+              <Form.Control 
+                type="text" 
+                value={profileForm.name} 
+                onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
+                required 
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Department</Form.Label>
+              <Form.Control 
+                type="text" 
+                value={profileForm.department} 
+                onChange={(e) => setProfileForm({...profileForm, department: e.target.value})} 
+              />
+            </Form.Group>
+            <Form.Group className="mb-4">
+              <Form.Label>Phone Number</Form.Label>
+              <Form.Control 
+                type="text" 
+                value={profileForm.phone} 
+                onChange={(e) => setProfileForm({...profileForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})} 
+                maxLength={10}
+                minLength={10}
+                pattern="\d{10}"
+              />
+            </Form.Group>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="light" onClick={() => setShowEditProfileModal(false)} disabled={profileLoading}>Cancel</Button>
+              <Button type="submit" disabled={profileLoading} style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', border: 'none' }}>
+                {profileLoading ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Saving...</> : 'Save Changes'}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal show={showChangePasswordModal} onHide={() => !passwordLoading && setShowChangePasswordModal(false)} centered backdrop="static">
+        <Modal.Header closeButton={!passwordLoading} className="border-0 pb-0">
+          <Modal.Title className="fw-bold">Change Password</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {passwordError && <Alert variant="danger" className="mb-3">{passwordError}</Alert>}
+          <Form onSubmit={handlePasswordChange}>
+            <Form.Group className="mb-3">
+              <Form.Label>Current Password</Form.Label>
+              <Form.Control 
+                type="password" 
+                value={passwordForm.currentPassword} 
+                onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                required 
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>New Password</Form.Label>
+              <Form.Control 
+                type="password" 
+                value={passwordForm.newPassword} 
+                onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                required 
+                minLength={6}
+              />
+            </Form.Group>
+            <Form.Group className="mb-4">
+              <Form.Label>Confirm New Password</Form.Label>
+              <Form.Control 
+                type="password" 
+                value={passwordForm.confirmPassword} 
+                onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                required 
+                minLength={6}
+              />
+            </Form.Group>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="light" onClick={() => setShowChangePasswordModal(false)} disabled={passwordLoading}>Cancel</Button>
+              <Button type="submit" disabled={passwordLoading} style={{ background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)', border: 'none' }}>
+                {passwordLoading ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Updating...</> : 'Update Password'}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* Modern Success Popup */}
+      <Modal show={showModernSuccess} onHide={() => setShowModernSuccess(false)} centered size="sm" className="border-0">
+        <Modal.Body className="text-center p-4">
+          <div className="mb-3">
+            <div className="rounded-circle bg-success d-inline-flex align-items-center justify-content-center shadow-sm" style={{width: '70px', height: '70px'}}>
+              <svg width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+          </div>
+          <h4 className="fw-bold mb-2">Success!</h4>
+          <p className="text-muted mb-4">Your profile has been updated successfully.</p>
+          <Button variant="success" className="w-100 rounded-pill fw-semibold py-2" onClick={() => setShowModernSuccess(false)}>Awesome</Button>
+        </Modal.Body>
       </Modal>
 
     </div>

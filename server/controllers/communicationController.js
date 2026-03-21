@@ -5,6 +5,7 @@ import Student from '../models/Student.js';
 import Staff from '../models/Staff.js';
 import HOD from '../models/HOD.js';
 import Announcement from '../models/Announcement.js';
+import { sendMail } from '../utils/mailer.js';
 
 // ============ MESSAGE CONTROLLERS ============
 
@@ -60,6 +61,32 @@ export const sendMessage = async (req, res) => {
       relatedTo: { type: 'Message', referenceId: newMessage._id },
       actionUrl: `/messages/${newMessage._id}`
     });
+
+    // Send email notification to receiver
+    if (receiver && receiver.email) {
+      const emailSubject = `✉️ New Message from ${req.user.name}: ${subject}`;
+      sendMail({
+        to: receiver.email,
+        subject: emailSubject,
+        text: `Dear ${receiver.name},\n\nYou have received a new direct message from ${req.user.name} (${senderRole}).\n\nSubject: ${subject}\nMessage: ${message}\n\nPlease login to your portal to reply.\n\nRegards,\nProject Portal`,
+        html: `
+          <div style="font-family: Arial, sans-serif; padding: 20px; background-color: #f4f4f4;">
+            <div style="background-color: #ffffff; padding: 20px; border-radius: 8px; max-width: 600px; margin: auto;">
+              <h2 style="color: #4f46e5;">New Direct Message</h2>
+              <p>Dear <strong>${receiver.name}</strong>,</p>
+              <p>You have received a new message from <strong>${req.user.name}</strong> (${senderRole}).</p>
+              <div style="background-color: #f9fafb; padding: 15px; border-left: 4px solid #4f46e5; margin: 20px 0;">
+                <p style="margin: 0 0 10px;"><strong>Subject:</strong> ${subject}</p>
+                <p style="margin: 0; white-space: pre-wrap; color: #555;">${message}</p>
+              </div>
+              <p style="margin-bottom: 20px;">Please login to the portal to reply to this message.</p>
+              <hr style="border: none; border-top: 1px solid #eaeaea;" />
+              <p style="font-size: 12px; color: #888; margin-top: 10px;">This is an automated notification. Please do not reply directly to this email.</p>
+            </div>
+          </div>
+        `
+      }).catch(err => console.error(`Failed to send message email to ${receiver.email}`, err));
+    }
 
     res.status(201).json({
       success: true,

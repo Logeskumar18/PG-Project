@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge, Table, ProgressBar } from 'react-bootstrap';
 
 const TeamDashboard = () => {
   const { user } = useAuth();
+const { theme, toggleTheme, getColor } = useTheme();
   const navigate = useNavigate();
   const { teamId } = useParams();
   const [activeTab, setActiveTab] = useState('overview');
@@ -75,18 +77,21 @@ const TeamDashboard = () => {
   };
 
   return (
-    <div className="min-vh-100" style={{background: '#f8f9fa'}}>
+    <div style={{ backgroundColor: getColor('bgPrimary') }}>
       {/* Navbar */}
-      <div className="bg-white shadow-sm py-3 sticky-top">
+      <div className={`shadow-sm py-3 sticky-top ${theme === 'dark' ? 'bg-dark border-bottom border-secondary' : 'bg-white'}`}>
         <Container fluid className="px-4">
           <div className="d-flex justify-content-between align-items-center">
             <div>
               <h4 className="fw-bold mb-0" style={{color: '#667eea'}}>👥 {team.name}</h4>
-              <small className="text-muted">{team.project.title}</small>
+              <small className={theme === 'dark' ? 'text-light' : 'text-muted'}>{team.project.title}</small>
             </div>
-            <Button variant="outline-secondary" size="sm" onClick={() => navigate(-1)}>
-              ← Back
-            </Button>
+            <div className="d-flex align-items-center gap-3">
+              <Button variant={theme === 'dark' ? 'outline-light' : 'outline-dark'} size="sm" onClick={toggleTheme} className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px', padding: 0 }}>{theme === 'dark' ? '☀️' : '🌙'}</Button>
+              <Button variant="outline-secondary" size="sm" onClick={() => navigate(-1)}>
+                ← Back
+              </Button>
+            </div>
           </div>
         </Container>
       </div>

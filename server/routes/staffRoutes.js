@@ -33,6 +33,16 @@ router.get(
 );
 
 /* ============================
+   DIRECTORY
+============================ */
+router.get(
+  '/hods',
+  protect,
+  isStaff,
+  staffController.getHods
+);
+
+/* ============================
    STUDENT MANAGEMENT
 ============================ */
 router.get(
@@ -210,6 +220,23 @@ router.put(
   protect,
   isStaff,
   staffController.updateMeetingStatus
+);
+
+/* ============================
+   PROFILE & SETTINGS
+============================ */
+router.put(
+  '/change-password',
+  protect,
+  isStaff,
+  staffController.changePassword
+);
+
+router.put(
+  '/update-profile',
+  protect,
+  isStaff,
+  staffController.updateProfile
 );
 
 export default router;

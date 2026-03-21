@@ -3,6 +3,7 @@ import ConfirmLogoutModal from '../components/ConfirmLogoutModal';
 import { DEPARTMENTS } from '../constants/departments';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge, Table, ProgressBar, Spinner } from 'react-bootstrap';
 import api from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -39,6 +40,7 @@ const HODDashboard = () => {
     });
     const [staffErrors, setStaffErrors] = useState({});
   const { user, logout } = useAuth();
+const { theme, toggleTheme, getColor } = useTheme();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [successMessage, setSuccessMessage] = useState('');
@@ -62,6 +64,24 @@ const HODDashboard = () => {
   const [evaluations, setEvaluations] = useState([]);
   const [deadlines, setDeadlines] = useState([]);
 
+  // Message States
+  const [messages, setMessages] = useState([]);
+  const [loadingMessages, setLoadingMessages] = useState(false);
+  
+  // Compose Modal State
+  const [showComposeModal, setShowComposeModal] = useState(false);
+  const [messageReceiver, setMessageReceiver] = useState('');
+  const [messageSubject, setMessageSubject] = useState('');
+  const [messageContent, setMessageContent] = useState('');
+  const [composeLoading, setComposeLoading] = useState(false);
+
+  // Reply Modal State
+  const [showReplyModal, setShowReplyModal] = useState(false);
+  const [replyToMessage, setReplyToMessage] = useState(null);
+  const [replySubject, setReplySubject] = useState('');
+  const [replyContent, setReplyContent] = useState('');
+  const [replyLoading, setReplyLoading] = useState(false);
+
   // Search filter state and logic for All Projects
   const [searchProject, setSearchProject] = useState('');
   const filteredProjects = projects.filter(project => {
@@ -72,6 +92,22 @@ const HODDashboard = () => {
       project.assignedGuideId?.name?.toLowerCase().includes(search)
     );
   });
+
+  const fetchMessages = async () => {
+    try {
+      setLoadingMessages(true);
+      const response = await api.get('/communication/messages/inbox');
+      if (response.data.data) {
+        setMessages(response.data.data);
+      } else {
+        setMessages([]);
+      }
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    } finally {
+      setLoadingMessages(false);
+    }
+  };
 
   // Fetch data from API
   useEffect(() => {
@@ -120,6 +156,9 @@ const HODDashboard = () => {
         if (deadlinesRes.data.data) {
           setDeadlines(deadlinesRes.data.data);
         }
+        
+        // Fetch messages
+        await fetchMessages();
 
         setLoading(false);
         setInitialLoading(false);
@@ -161,6 +200,75 @@ const HODDashboard = () => {
   const handleViewProfile = (user, type) => {
     setSelectedProfileUser({ ...user, profileType: type });
     setShowProfileModal(true);
+  };
+
+  const handleSendMessage = async (e) => {
+    e.preventDefault();
+    if (!messageReceiver || !messageSubject.trim() || !messageContent.trim()) return;
+
+    try {
+      setComposeLoading(true);
+      await api.post('/communication/messages', {
+        receiverId: messageReceiver,
+        subject: messageSubject,
+        message: messageContent
+      });
+      setSuccessMessage('Message sent successfully!');
+      setShowComposeModal(false);
+      setMessageReceiver('');
+      setMessageSubject('');
+      setMessageContent('');
+      await fetchMessages();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      setErrorMessage('Error sending message: ' + (error.response?.data?.message || error.message));
+      setTimeout(() => setErrorMessage(''), 5000);
+    } finally {
+      setComposeLoading(false);
+    }
+  };
+
+  const handleReply = (message) => {
+    setReplyToMessage(message);
+    setReplySubject(`Re: ${message.subject}`);
+    setReplyContent('');
+    setShowReplyModal(true);
+  };
+
+  const handleSendReply = async (e) => {
+    e.preventDefault();
+    if (!replyContent.trim()) return;
+    
+    try {
+      setReplyLoading(true);
+      const receiverId = replyToMessage.senderId?._id || replyToMessage.senderId;
+      await api.post('/communication/messages', {
+        receiverId: receiverId,
+        subject: replySubject,
+        message: replyContent
+      });
+      setSuccessMessage('Reply sent successfully!');
+      setShowReplyModal(false);
+      await fetchMessages();
+      setTimeout(() => setSuccessMessage(''), 3000);
+    } catch (error) {
+      setErrorMessage('Error sending reply: ' + (error.response?.data?.message || error.message));
+      setTimeout(() => setErrorMessage(''), 5000);
+    } finally {
+      setReplyLoading(false);
+    }
+  };
+
+  const handleMarkAsRead = async (messageId) => {
+    try {
+      setMessages(messages.map(msg => 
+        msg._id === messageId ? { ...msg, isRead: true } : msg
+      ));
+      await api.put(`/communication/messages/${messageId}/read`);
+    } catch (error) {
+      console.error('Error marking message as read:', error);
+      fetchMessages(); // Revert on failure
+    }
   };
 
   const handleApproveFinal = (project) => {
@@ -488,28 +596,31 @@ const HODDashboard = () => {
 
   if (initialLoading) {
     return (
-      <div className="min-vh-100 d-flex justify-content-center align-items-center" style={{ background: '#f8f9fa' }}>
+      <div className="min-vh-100 d-flex justify-content-center align-items-center" style={{ backgroundColor: getColor('bgPrimary') }}>
         <Spinner animation="border" variant="primary" />
       </div>
     );
   }
 
   return (
-    <div className="min-vh-100" style={{ background: '#f8f9fa' }}>
+    <div className={`min-vh-100 ${theme === 'dark' ? 'bg-dark text-light' : 'bg-light text-dark'}`} style={{ backgroundColor: getColor('bgPrimary') }}>
       {/* Navbar */}
-      <div className="bg-white shadow-sm py-3 sticky-top">
+      <div className={`shadow-sm py-3 sticky-top ${theme === 'dark' ? 'bg-dark border-bottom border-secondary' : 'bg-white'}`}>
         <Container fluid className="px-4">
           <div className="d-flex justify-content-between align-items-center">
             <div>
               <h4 className="fw-bold mb-0" style={{ color: '#f093fb' }}>👨‍💼 HOD Dashboard</h4>
-              <small className="text-muted">Welcome, {user?.name}</small>
+              <small className={theme === 'dark' ? 'text-light' : 'text-muted'}>Welcome, {user?.name}</small>
             </div>
-            <Button variant="danger" size="sm" onClick={handleLogoutClick}>Logout</Button>
-                <ConfirmLogoutModal
-                  show={showLogoutModal}
-                  onConfirm={handleConfirmLogout}
-                  onCancel={handleCancelLogout}
-                />
+            <div className="d-flex align-items-center gap-3">
+              <Button variant={theme === 'dark' ? 'outline-light' : 'outline-dark'} size="sm" onClick={toggleTheme} className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px', padding: 0 }}>{theme === 'dark' ? '☀️' : '🌙'}</Button>
+              <Button variant="danger" size="sm" onClick={handleLogoutClick}>Logout</Button>
+            </div>
+            <ConfirmLogoutModal
+              show={showLogoutModal}
+              onConfirm={handleConfirmLogout}
+              onCancel={handleCancelLogout}
+            />
           </div>
         </Container>
       </div>
@@ -590,6 +701,13 @@ const HODDashboard = () => {
             className="fw-semibold"
           >
             🕒 Activity Log
+          </Button>
+          <Button
+            variant={activeTab === 'messages' ? 'primary' : 'light'}
+            onClick={() => setActiveTab('messages')}
+            className="fw-semibold"
+          >
+            💬 Messages
           </Button>
         </div>
 
@@ -1108,6 +1226,88 @@ const HODDashboard = () => {
             </Col>
           </Row>
         )}
+
+        {/* Messages Tab */}
+        {activeTab === 'messages' && (
+          <Row className="g-4">
+            <Col lg={12}>
+              <Card className="border-0 shadow-sm">
+                <Card.Body className="p-4">
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h5 className="fw-bold mb-0">💬 Messages</h5>
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      onClick={() => setShowComposeModal(true)}
+                    >
+                      ✉️ Compose Message
+                    </Button>
+                  </div>
+                  {loadingMessages ? (
+                    <div className="text-center text-muted py-4">Loading messages...</div>
+                  ) : messages.length === 0 ? (
+                    <div className="text-center text-muted py-4">No messages yet</div>
+                  ) : (
+                    <div className="d-flex flex-column">
+                      {messages.map(message => (
+                        <div 
+                          key={message._id} 
+                          className={`p-4 border rounded-4 mb-3 transition-all ${!message.isRead ? 'bg-white border-primary shadow-sm' : 'bg-light border-0 shadow-sm'}`}
+                          style={{ transition: 'all 0.3s ease' }}
+                        >
+                          <div className="d-flex justify-content-between align-items-start gap-3">
+                            <div className="d-flex align-items-center justify-content-center rounded-circle text-white flex-shrink-0 shadow-sm" style={{ width: '48px', height: '48px', fontSize: '1.2rem', fontWeight: 'bold', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}>
+                              {(message.senderId?.name || 'U').charAt(0).toUpperCase()}
+                            </div>
+                            <div className="flex-grow-1">
+                              <div className="d-flex justify-content-between align-items-center mb-1">
+                                <div className="d-flex align-items-center gap-2">
+                                  <h6 className="mb-0 fw-bold text-dark">{message.senderId?.name || 'Unknown'}</h6>
+                                  <Badge bg="secondary" pill className="fw-normal" style={{ fontSize: '0.7rem' }}>{message.senderId?.role || 'User'}</Badge>
+                                  {!message.isRead && <Badge bg="danger" pill style={{ fontSize: '0.65rem' }}>New</Badge>}
+                                </div>
+                                <small className="text-muted fw-semibold">
+                                  {new Date(message.createdAt).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                                </small>
+                              </div>
+                              <h6 className={`mb-3 mt-2 ${!message.isRead ? 'fw-bold text-dark' : 'fw-semibold text-secondary'}`}>
+                                {message.subject}
+                              </h6>
+                              <div className="p-3 bg-white rounded-3 border text-secondary shadow-sm" style={{ whiteSpace: 'pre-wrap', fontSize: '0.95rem' }}>
+                                {message.message}
+                              </div>
+                            </div>
+                          <div className="flex-shrink-0 d-flex gap-2">
+                            {!message.isRead && (
+                              <Button
+                                variant="outline-success"
+                                size="sm"
+                                className="rounded-pill px-3 shadow-sm fw-semibold"
+                                onClick={() => handleMarkAsRead(message._id)}
+                              >
+                                ✔️ Mark Read
+                              </Button>
+                            )}
+                              <Button
+                                variant={!message.isRead ? 'primary' : 'outline-primary'}
+                                size="sm"
+                                className="rounded-pill px-3 shadow-sm fw-semibold"
+                                onClick={() => handleReply(message)}
+                                style={!message.isRead ? { background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', border: 'none' } : {}}
+                              >
+                                ↩️ Reply
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        )}
       </Container>
 
       {/* Modals */}
@@ -1471,6 +1671,131 @@ const HODDashboard = () => {
             {loading ? 'Deleting...' : 'Delete'}
           </Button>
         </Modal.Footer>
+      </Modal>
+
+      {/* Compose Message Modal */}
+      <Modal show={showComposeModal} onHide={() => setShowComposeModal(false)} size="lg" centered className="border-0">
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">✉️ Compose Message</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="pt-2">
+          <Form onSubmit={handleSendMessage}>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold text-muted small text-uppercase">Recipient *</Form.Label>
+              <Form.Select
+                value={messageReceiver}
+                onChange={(e) => setMessageReceiver(e.target.value)}
+                required
+                className="py-2 rounded-3"
+              >
+                <option value="">Select a recipient...</option>
+                <optgroup label="Staff">
+                  {staff.map(member => (
+                    <option key={member._id || member.id} value={member.userId || member._id}>
+                      {member.name} ({member.department || 'Staff'})
+                    </option>
+                  ))}
+                </optgroup>
+                <optgroup label="Students">
+                  {students.map(student => (
+                    <option key={student._id || student.id} value={student.userId || student._id}>
+                      {student.name} ({student.studentId})
+                    </option>
+                  ))}
+                </optgroup>
+              </Form.Select>
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold text-muted small text-uppercase">Subject *</Form.Label>
+              <Form.Control
+                type="text"
+                placeholder="Enter message subject"
+                value={messageSubject}
+                onChange={(e) => setMessageSubject(e.target.value)}
+                required
+                className="py-2 rounded-3"
+              />
+            </Form.Group>
+            <Form.Group className="mb-4">
+              <Form.Label className="fw-semibold text-muted small text-uppercase">Message *</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={5}
+                placeholder="Type your message here..."
+                value={messageContent}
+                onChange={(e) => setMessageContent(e.target.value)}
+                required
+                className="rounded-3"
+              />
+            </Form.Group>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="light" onClick={() => setShowComposeModal(false)} className="rounded-pill px-4 fw-semibold shadow-sm">
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                type="submit"
+                disabled={composeLoading || !messageReceiver || !messageSubject.trim() || !messageContent.trim()}
+                className="rounded-pill px-4 fw-semibold shadow-sm"
+                style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', border: 'none' }}
+              >
+                {composeLoading ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Sending...</> : 'Send Message'}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* Reply Modal */}
+      <Modal show={showReplyModal} onHide={() => setShowReplyModal(false)} centered className="border-0">
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">↩️ Reply to Message</Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="pt-2">
+          <Form onSubmit={handleSendReply}>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold text-muted small text-uppercase">To</Form.Label>
+              <Form.Control
+                value={replyToMessage?.senderId?.name || 'Unknown'}
+                disabled
+                className="bg-light border-0 py-2 rounded-3 text-dark fw-semibold"
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label className="fw-semibold text-muted small text-uppercase">Subject</Form.Label>
+              <Form.Control
+                value={replySubject}
+                onChange={(e) => setReplySubject(e.target.value)}
+                required
+                className="py-2 rounded-3"
+              />
+            </Form.Group>
+            <Form.Group className="mb-4">
+              <Form.Label className="fw-semibold text-muted small text-uppercase">Message</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={5}
+                value={replyContent}
+                onChange={(e) => setReplyContent(e.target.value)}
+                placeholder="Type your reply here..."
+                required
+                className="rounded-3"
+              />
+            </Form.Group>
+            <div className="d-flex gap-2 justify-content-end">
+              <Button variant="light" onClick={() => setShowReplyModal(false)} className="rounded-pill px-4 fw-semibold shadow-sm">Cancel</Button>
+              <Button 
+                type="submit" 
+                variant="primary" 
+                disabled={replyLoading}
+                className="rounded-pill px-4 fw-semibold shadow-sm"
+                style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', border: 'none' }}
+              >
+                {replyLoading ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Sending...</> : 'Send Reply'}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
       </Modal>
     </div>
   );

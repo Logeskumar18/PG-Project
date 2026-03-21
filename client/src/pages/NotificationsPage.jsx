@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+import { useTheme } from '../context/ThemeContext';
 import { Container, Card, Badge, ListGroup, Button, Dropdown, ButtonGroup } from 'react-bootstrap';
 
 const NotificationsPage = () => {
   const { user } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [filter, setFilter] = useState('all'); // all, unread, read
 
@@ -104,16 +106,17 @@ const NotificationsPage = () => {
   };
 
   return (
-    <div className="min-vh-100" style={{background: '#f8f9fa'}}>
-      {/* Navbar */}
-      <div className="bg-white shadow-sm py-3 sticky-top">
+    <div className={`min-vh-100 ${theme === 'dark' ? 'bg-dark text-light' : 'bg-light text-dark'}`} style={{ backgroundColor: getColor('bgPrimary') }}>
+  {/* Navbar */}
+  <div className={`shadow-sm py-3 sticky-top navbar navbar-light ${theme === 'dark' ? 'navbar-dark bg-dark border-bottom border-secondary' : 'navbar-light bg-light border-bottom'}`}>
         <Container fluid className="px-4">
           <div className="d-flex justify-content-between align-items-center">
             <div className="d-flex align-items-center gap-3">
-              <h4 className="fw-bold mb-0" style={{color: '#667eea'}}>🔔 Notifications</h4>
+              <h4 className="fw-bold mb-0" style={{color: getColor('accent')}}>🔔 Notifications</h4>
               <Badge bg="danger" pill>{unreadCount}</Badge>
             </div>
-            <div className="d-flex gap-2">
+            <div className="d-flex align-items-center gap-2">
+              <Button variant={theme === 'dark' ? 'outline-light' : 'outline-dark'} size="sm" onClick={toggleTheme} className="rounded-circle d-flex align-items-center justify-content-center me-2" style={{ width: '32px', height: '32px', padding: 0 }}>{theme === 'dark' ? '☀️' : '🌙'}</Button>
               <Button variant="outline-primary" size="sm" onClick={markAllAsRead}>
                 Mark All Read
               </Button>

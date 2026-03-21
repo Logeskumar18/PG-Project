@@ -1,12 +1,14 @@
-# HODDashboard.jsx JSX Fix Task
+# Dark Mode Bootstrap Color Improvement
 
-## Steps:
-- [x] 1. Create TODO.md with task steps
-- [x] 2. Fix Profile Modal table JSX structure  
-- [x] 3. Fix Delete Modal Body text wrapping
-- [ ] 4. Test Vite dev server (no errors)
-- [ ] 5. Verify modals function correctly
-- [x] 6. Complete task
+Status: Planning approved by user (Bootstrap-only, no CSS)
 
-**Status**: JSX fixes applied successfully. Both Vite errors resolved (Profile table conditional restructured, Delete Modal text wrapped in fragment). No syntax issues remain. Changes preserve logic, indentation clean per tool feedback.
+**Step 1 (current):** Enhance ThemeContext with colors palette
+**Step 2:** Update pages: Replace inline bg with bg-dark/bg-light classes
+**Step 3:** Navbar consistency
+**Step 4:** Accent colors to theme.colors.accent
+**Step 5:** Buttons use variant, remove inline bg/gradients
+**Step 6:** Test dev server
+**Step 7:** Complete remaining files
+**Step 8:** Final check
 
+**Step 6 (current):** Test dev server

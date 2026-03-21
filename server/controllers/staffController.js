@@ -5,10 +5,12 @@ import Progress from '../models/Progress.js';
 import Staff from '../models/Staff.js';
 import Mark from '../models/Mark.js';
 import Meeting from '../models/Meeting.js';
-import { notifyProjectApproval, notifyProjectRejection, notifyDocumentReview, notifyProgressReview, notifyMarksAssigned, createNotification } from '../utils/notificationService.js';
+import { notifyProjectApproval, notifyProjectRejection, notifyDocumentReview, notifyProgressReview, notifyMarksAssigned, createNotification, notifyPasswordChange } from '../utils/notificationService.js';
 import { sendMail } from '../utils/mailer.js';
 import Student from '../models/Student.js';
 import mongoose from "mongoose";
+import HOD from '../models/HOD.js';
+import bcrypt from 'bcryptjs';
 
 // Get assigned students (ownership-based + project-assigned)
 export const getAssignedStudents = async (req, res) => {
@@ -62,6 +64,86 @@ export const getAssignedStudents = async (req, res) => {
       status: 'error',
       message: error.message
     });
+  }
+};
+
+// Get HODs for communication
+export const getHods = async (req, res) => {
+  try {
+    // Fetch HODs from the HOD collection directly
+    const hods = await HOD.find().select('name email');
+    
+    const formattedHods = hods.map(h => ({
+      _id: h._id,
+      name: h.name,
+      email: h.email,
+      role: 'HOD'
+    }));
+
+    res.json({ status: 'success', data: formattedHods });
+  } catch (error) {
+    res.status(500).json({ status: 'error', message: error.message });
+  }
+};
+
+// ================= PASSWORD MANAGEMENT =================
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    // Enforce stricter password requirements
+    const passwordRegex = /^(?=.*[0-9])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]{6,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({ 
+        message: 'Password must be at least 6 characters long and contain at least one number and one special character' 
+      });
+    }
+
+    // Look up the current staff making the request
+    const staff = await Staff.findById(req.user._id).select('+password');
+    if (!staff) {
+      return res.status(404).json({ message: 'Staff profile not found' });
+    }
+
+    // Verify that the provided current password matches the one in the database
+    const isMatch = await bcrypt.compare(currentPassword, staff.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Incorrect current password' });
+    }
+
+    // Hash the new password and save it
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    staff.password = hashedPassword;
+    await staff.save();
+
+    // Send security notification email
+    await notifyPasswordChange(staff);
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error changing password', error: error.message });
+  }
+};
+
+// ================= PROFILE MANAGEMENT =================
+export const updateProfile = async (req, res) => {
+  try {
+    const { name, department, phone } = req.body;
+    
+    const staff = await Staff.findByIdAndUpdate(
+      req.user._id,
+      { name, department, phone },
+      { new: true, runValidators: true }
+    ).select('-password');
+    
+    if (!staff) {
+      return res.status(404).json({ message: 'Staff profile not found' });
+    }
+    
+    res.json({ success: true, message: 'Profile updated successfully', data: staff });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating profile', error: error.message });
   }
 };
 

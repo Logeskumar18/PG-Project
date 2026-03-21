@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { AuthProvider } from './context/AuthContext';
 import ProtectedRoute from './components/ProtectedRoute';
 import Home from './pages/Home';
+import { ThemeProvider } from './context/ThemeContext';
 
 // Role-specific login pages
 import HODLogin from './pages/HODLogin';
@@ -24,6 +25,7 @@ import NotificationsPage from './pages/NotificationsPage';
 function App() {
   return (
     <Router>
+      <ThemeProvider>
       <AuthProvider>
         <Routes>
           {/* Home/Landing page */}
@@ -96,6 +98,7 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </AuthProvider>
+      </ThemeProvider>
     </Router>
   );
 }

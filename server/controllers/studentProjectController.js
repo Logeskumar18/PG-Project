@@ -30,9 +30,10 @@ import Progress from '../models/Progress.js';
 import Meeting from '../models/Meeting.js';
 import multer from 'multer';
 import path from 'path';
-import { createNotification, notifyDocumentSubmission, notifyProgressSubmission } from '../utils/notificationService.js';
+import { createNotification, notifyDocumentSubmission, notifyProgressSubmission, notifyPasswordChange } from '../utils/notificationService.js';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
+import bcrypt from 'bcryptjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -488,5 +489,45 @@ export const getMyMeetings = async (req, res) => {
     res.json({ success: true, data: meetings });
   } catch (error) {
     res.status(500).json({ message: 'Error fetching meetings', error: error.message });
+  }
+};
+
+// ================= PASSWORD MANAGEMENT =================
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    // Enforce stricter password requirements
+    const passwordRegex = /^(?=.*[0-9])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]{6,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({ 
+        message: 'Password must be at least 6 characters long and contain at least one number and one special character' 
+      });
+    }
+
+    // Look up the current student making the request
+    const student = await Student.findById(req.user._id).select('+password');
+    if (!student) {
+      return res.status(404).json({ message: 'Student profile not found' });
+    }
+
+    // Verify that the provided current password matches the one in the database
+    const isMatch = await bcrypt.compare(currentPassword, student.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Incorrect current password' });
+    }
+
+    // Hash the new password and save it
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    student.password = hashedPassword;
+    await student.save();
+
+    // Send security notification email
+    await notifyPasswordChange(student);
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error changing password', error: error.message });
   }
 };
