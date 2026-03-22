@@ -53,3 +53,27 @@ run();
 // EMAIL_PASS=zlkc qvvg ywrx uhvl
 
 
+
+
+
+// PORT=5000
+// NODE_ENV=development
+
+ 
+// MONGODB_URI=mongodb+srv://logeskumarr2004_db_user:1234@cluster0.pa1abpq.mongodb.net/?appName=Cluster0
+
+// // # JWT Secret (Change this to a random secure string in production)
+// JWT_SECRET=loges123
+// JWT_EXPIRE=7d
+
+ 
+// CLIENT_URL=http://localhost:5173
+
+// EMAIL_SERVICE=gmail
+// EMAIL_USER=academic.project.platform@gmail.com
+// CLOUDINARY_URL=cloudinary://NE51mh0nqv5FOdFFvHP1Nov6Gys:345475855526144@douuzrdih
+// EMAIL_PASS=xujh ndze qyek yhqq
+
+// CLOUDINARY_CLOUD_NAME=douuzrdih
+// CLOUDINARY_API_KEY=345475855526144
+// CLOUDINARY_API_SECRET=NE51mh0nqv5FOdFFvHP1Nov6Gys
