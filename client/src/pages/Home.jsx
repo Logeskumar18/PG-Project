@@ -2,11 +2,9 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Container, Row, Col, Card, Button, Navbar, Nav, Dropdown, Badge } from 'react-bootstrap';
 import api from '../services/api';
-import { useTheme } from '../context/ThemeContext';
 
 const Home = () => {
   const [topProjects, setTopProjects] = useState([]);
-  const { theme, toggleTheme } = useTheme();
 
   useEffect(() => {
     const fetchShowcase = async () => {
@@ -24,9 +22,9 @@ const Home = () => {
   }, []);
 
   return (
-    <div className={`min-vh-100 ${theme === 'dark' ? 'bg-dark text-light' : 'bg-light text-dark'}`} style={theme === 'dark' ? { background: '#121212' } : { background: '#f8f9fa' }}>
+    <div className="min-vh-100 bg-light text-dark" style={{ background: '#f8f9fa' }}>
       {/* Navigation Bar */}
-      <Navbar bg={theme === 'dark' ? 'dark' : 'white'} variant={theme === 'dark' ? 'dark' : 'light'} expand="lg" className="shadow-sm py-3 sticky-top">
+      <Navbar bg="white" variant="light" expand="lg" className="shadow-sm py-3 sticky-top">
         <Container>
           <Navbar.Brand className="fw-bold fs-3" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'}}>
              Project Tracking
@@ -38,9 +36,6 @@ const Home = () => {
               <Nav.Link href="#showcase" className="fw-semibold">Showcase</Nav.Link>
               <Nav.Link href="#roles" className="fw-semibold">Access Portal</Nav.Link>
               <Nav.Link href="#about" className="fw-semibold">About</Nav.Link>
-              <Button variant={theme === 'dark' ? 'outline-light' : 'outline-dark'} size="sm" onClick={toggleTheme} className="me-2 rounded-circle" style={{ width: '36px', height: '36px', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                {theme === 'dark' ? '☀️' : '🌙'}
-              </Button>
               <Dropdown>
                 <Dropdown.Toggle 
                   variant="primary" 

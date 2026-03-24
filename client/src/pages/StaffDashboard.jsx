@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import ConfirmLogoutModal from '../components/ConfirmLogoutModal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge, Table } from 'react-bootstrap';
 import api from '../services/api';
 import { Document, Page, pdfjs } from 'react-pdf';
@@ -13,7 +12,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 const StaffDashboard = () => {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [successMessage, setSuccessMessage] = useState('');
@@ -110,6 +108,28 @@ const StaffDashboard = () => {
   const [messageContent, setMessageContent] = useState('');
   const [showStudentProfileModal, setShowStudentProfileModal] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState(null);
+
+  const [projectSearchQuery, setProjectSearchQuery] = useState('');
+  const [projectFilterStatus, setProjectFilterStatus] = useState('All');
+  const [approvalPage, setApprovalPage] = useState(1);
+
+  const [docSearchQuery, setDocSearchQuery] = useState('');
+  const [docFilterStatus, setDocFilterStatus] = useState('All');
+
+  const [studentSearchQuery, setStudentSearchQuery] = useState('');
+  const [studentFilter, setStudentFilter] = useState('All');
+  const [studentPage, setStudentPage] = useState(1);
+
+  const [docPage, setDocPage] = useState(1);
+  const [evaluationPage, setEvaluationPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
+  useEffect(() => {
+    setApprovalPage(1);
+  }, [projectSearchQuery, projectFilterStatus, pageSize]);
+  useEffect(() => { setDocPage(1); }, [docSearchQuery, docFilterStatus, pageSize]);
+  useEffect(() => { setStudentPage(1); }, [studentSearchQuery, studentFilter, pageSize]);
+  useEffect(() => { setEvaluationPage(1); }, [pageSize]);
 
   // Profile Management States
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -562,29 +582,76 @@ const StaffDashboard = () => {
   const pendingDocReviews = documents.filter(d => (d.reviewStatus || d.status) === 'Pending').length;
   const unreadMessagesCount = messages.filter(m => !m.isRead).length;
 
+  const filteredApprovals = projects.filter(project => {
+    const search = projectSearchQuery.toLowerCase();
+    const titleMatch = (project.title || '').toLowerCase().includes(search);
+    const studentMatch = (project.studentId?.name || '').toLowerCase().includes(search);
+    const matchesSearch = titleMatch || studentMatch;
+    
+    const status = project.approvalStatus || project.approval || 'Pending';
+    const matchesStatus = projectFilterStatus === 'All' || status === projectFilterStatus;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const indexOfLastApproval = approvalPage * pageSize;
+  const indexOfFirstApproval = indexOfLastApproval - pageSize;
+  const currentApprovals = filteredApprovals.slice(indexOfFirstApproval, indexOfLastApproval);
+  const totalApprovalPages = Math.ceil(filteredApprovals.length / pageSize);
+
+  const filteredDocuments = documents.filter(doc => {
+    const search = docSearchQuery.toLowerCase();
+    const fileNameMatch = (doc.fileName || '').toLowerCase().includes(search);
+    const studentMatch = (doc.studentId?.name || '').toLowerCase().includes(search);
+    const matchesSearch = fileNameMatch || studentMatch;
+    
+    const status = doc.reviewStatus || doc.status || 'Pending';
+    const matchesStatus = docFilterStatus === 'All' || status === docFilterStatus;
+    
+    return matchesSearch && matchesStatus;
+  });
+
+  const indexOfLastDoc = docPage * pageSize;
+  const indexOfFirstDoc = indexOfLastDoc - pageSize;
+  const currentDocuments = filteredDocuments.slice(indexOfFirstDoc, indexOfLastDoc);
+  const totalDocPages = Math.ceil(filteredDocuments.length / pageSize);
+
+  const filteredStudents = assignedStudents.filter(student => {
+    const search = studentSearchQuery.toLowerCase();
+    const matchesSearch = (student.name || '').toLowerCase().includes(search) ||
+                          (student.studentId || '').toLowerCase().includes(search) ||
+                          (student.email || '').toLowerCase().includes(search);
+    
+    const projectCount = student.projectCount || student.projects || 0;
+    let matchesFilter = true;
+    if (studentFilter === 'With Projects') matchesFilter = projectCount > 0;
+    if (studentFilter === 'Without Projects') matchesFilter = projectCount === 0;
+
+    return matchesSearch && matchesFilter;
+  });
+
+  const indexOfLastStudent = studentPage * pageSize;
+  const indexOfFirstStudent = indexOfLastStudent - pageSize;
+  const currentStudents = filteredStudents.slice(indexOfFirstStudent, indexOfLastStudent);
+  const totalStudentPages = Math.ceil(filteredStudents.length / pageSize);
+
+  const evaluatedProjects = projects.filter(project => (project.approvalStatus || project.approval) === 'Approved');
+  const indexOfLastEval = evaluationPage * pageSize;
+  const indexOfFirstEval = indexOfLastEval - pageSize;
+  const currentEvals = evaluatedProjects.slice(indexOfFirstEval, indexOfLastEval);
+  const totalEvalPages = Math.ceil(evaluatedProjects.length / pageSize);
+
   return (
-    <div className={`min-vh-100 ${theme === 'dark' ? 'bg-dark text-light' : 'bg-light text-dark'}`} style={theme === 'dark' ? { background: '#121212' } : { background: '#f8f9fa' }}>
-      <style>
-        {`
-          @keyframes slideUpFade {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .profile-card-animate {
-            animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          }
-        `}
-      </style>
+      <div className="min-vh-100 bg-light text-dark" style={{ background: '#f8f9fa' }}>
       {/* Navbar */}
-      <div className={`shadow-sm py-3 sticky-top ${theme === 'dark' ? 'bg-dark border-bottom border-secondary' : 'bg-white'}`}>
+      <div className="shadow-sm py-3 sticky-top bg-white">
         <Container fluid className="px-4">
           <div className="d-flex justify-content-between align-items-center">
             <div>
               <h4 className="fw-bold mb-0" style={{ color: '#4facfe' }}>👨‍🏫 Staff Dashboard</h4>
-              <small className={theme === 'dark' ? 'text-light' : 'text-muted'}>Welcome, {user?.name}</small>
+              <small className="text-muted">Welcome, {user?.name}</small>
             </div>
             <div className="d-flex align-items-center gap-3">
-              <Button variant={theme === 'dark' ? 'outline-light' : 'outline-dark'} size="sm" onClick={toggleTheme} className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px', padding: 0 }}>{theme === 'dark' ? '☀️' : '🌙'}</Button>
               <Button variant="danger" size="sm" onClick={handleLogoutClick}>Logout</Button>
             </div>
                 <ConfirmLogoutModal
@@ -951,6 +1018,37 @@ const StaffDashboard = () => {
               <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
                   <h5 className="fw-bold mb-4">👥 My Assigned Students</h5>
+
+                  {assignedStudents.length > 0 && (
+                    <Row className="mb-4 g-2">
+                      <Col md={6}>
+                        <Form.Control 
+                          type="text" 
+                          placeholder="Search by student name, ID, or email..." 
+                          value={studentSearchQuery}
+                          onChange={(e) => setStudentSearchQuery(e.target.value)}
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Select 
+                          value={studentFilter}
+                          onChange={(e) => setStudentFilter(e.target.value)}
+                        >
+                          <option value="All">All Students</option>
+                          <option value="With Projects">With Projects</option>
+                          <option value="Without Projects">Without Projects</option>
+                        </Form.Select>
+                      </Col>
+                      <Col md={2}>
+                        <Form.Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                          <option value={5}>5 / page</option>
+                          <option value={10}>10 / page</option>
+                          <option value={20}>20 / page</option>
+                        </Form.Select>
+                      </Col>
+                    </Row>
+                  )}
+
                   <Table hover responsive>
                     <thead>
                       <tr>
@@ -962,20 +1060,35 @@ const StaffDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {assignedStudents.map(student => (
-                        <tr key={student._id || student.id}>
-                          <td className="fw-semibold">{student.name}</td>
-                          <td>{student.studentId}</td>
-                          <td>{student.email}</td>
-                          <td><Badge bg="primary">{student.projectCount || student.projects || 0}</Badge></td>
-                          <td>
-                            <Button variant="sm" size="sm" className="me-2" onClick={() => handleViewProfile(student)}>View Profile</Button>
-                            {/* <Button variant="outline-secondary" size="sm">Send Message</Button> */}
-                          </td>
+{currentStudents.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="text-center py-4 text-muted">No matching students found.</td>
                         </tr>
-                      ))}
+                      ) : (
+                        currentStudents.map(student => (
+                          <tr key={student._id || student.id}>
+                            <td className="fw-semibold">{student.name}</td>
+                            <td>{student.studentId}</td>
+                            <td>{student.email}</td>
+                            <td><Badge bg="primary">{student.projectCount || student.projects || 0}</Badge></td>
+                            <td>
+                              <Button variant="sm" size="sm" className="me-2" onClick={() => handleViewProfile(student)}>View Profile</Button>
+                              {/* <Button variant="outline-secondary" size="sm">Send Message</Button> */}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </Table>
+                  {totalStudentPages > 1 && (
+                    <div className="d-flex justify-content-center mt-4">
+                      <div className="d-flex gap-2 align-items-center">
+                        <Button variant="outline-primary" size="sm" onClick={() => setStudentPage(prev => Math.max(prev - 1, 1))} disabled={studentPage === 1}>Previous</Button>
+                        <span className="px-2 small fw-semibold">Page {studentPage} of {totalStudentPages}</span>
+                        <Button variant="outline-primary" size="sm" onClick={() => setStudentPage(prev => Math.min(prev + 1, totalStudentPages))} disabled={studentPage === totalStudentPages}>Next</Button>
+                      </div>
+                    </div>
+                  )}
                 </Card.Body>
               </Card>
             </Col>
@@ -990,9 +1103,43 @@ const StaffDashboard = () => {
                 <Card.Body className="p-4">
                   <h5 className="fw-bold mb-4">✅ Project Approvals</h5>
 
+                  {projects.length > 0 && (
+                    <Row className="mb-4 g-2">
+                      <Col md={6}>
+                        <Form.Control 
+                          type="text" 
+                          placeholder="Search by project title or student name..." 
+                          value={projectSearchQuery}
+                          onChange={(e) => setProjectSearchQuery(e.target.value)}
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Select 
+                          value={projectFilterStatus}
+                          onChange={(e) => setProjectFilterStatus(e.target.value)}
+                        >
+                          <option value="All">All Statuses</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Approved">Approved</option>
+                          <option value="Rejected">Rejected</option>
+                        </Form.Select>
+                      </Col>
+                      <Col md={2}>
+                        <Form.Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                          <option value={5}>5 / page</option>
+                          <option value={10}>10 / page</option>
+                          <option value={20}>20 / page</option>
+                        </Form.Select>
+                      </Col>
+                    </Row>
+                  )}
+
                   {Array.isArray(projects) && projects.length > 0 ? (
-                    <div className="d-flex flex-column gap-3">
-                      {projects.map((project) => {
+                    <>
+                      <div className="d-flex flex-column gap-3">
+                      {currentApprovals.length === 0 ? (
+                        <p className="text-muted text-center py-4 mb-0">No matching projects found.</p>
+                      ) : currentApprovals.map((project) => {
                         const status = project.approvalStatus || project.approval || 'Pending';
 
                         return (
@@ -1069,7 +1216,34 @@ const StaffDashboard = () => {
                           </div>
                         );
                       })}
-                    </div>
+                      </div>
+
+                      {totalApprovalPages > 1 && (
+                        <div className="d-flex justify-content-center mt-4">
+                          <div className="d-flex gap-2 align-items-center">
+                            <Button 
+                              variant="outline-primary" 
+                              size="sm" 
+                              onClick={() => setApprovalPage(prev => Math.max(prev - 1, 1))}
+                              disabled={approvalPage === 1}
+                            >
+                              Previous
+                            </Button>
+                            <span className="px-2 small fw-semibold">
+                              Page {approvalPage} of {totalApprovalPages}
+                            </span>
+                            <Button 
+                              variant="outline-primary" 
+                              size="sm" 
+                              onClick={() => setApprovalPage(prev => Math.min(prev + 1, totalApprovalPages))}
+                              disabled={approvalPage === totalApprovalPages}
+                            >
+                              Next
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   ) : (
                     <p className="text-muted text-center mb-0">
                       No projects pending approval.
@@ -1088,6 +1262,18 @@ const StaffDashboard = () => {
               <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
                   <h5 className="fw-bold mb-4">📝 Project Evaluations</h5>
+                  {evaluatedProjects.length > 0 && (
+                    <Row className="mb-4 g-2">
+                      <Col md={10}></Col>
+                      <Col md={2}>
+                        <Form.Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                          <option value={5}>5 / page</option>
+                          <option value={10}>10 / page</option>
+                          <option value={20}>20 / page</option>
+                        </Form.Select>
+                      </Col>
+                    </Row>
+                  )}
                   <Table hover responsive>
                     <thead>
                       <tr>
@@ -1098,9 +1284,11 @@ const StaffDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {projects
-                        .filter(project => (project.approvalStatus || project.approval) === 'Approved')
-                        .map(project => (
+                      {currentEvals.length === 0 ? (
+                        <tr>
+                          <td colSpan="4" className="text-center py-4 text-muted">No evaluated projects found.</td>
+                        </tr>
+                      ) : currentEvals.map(project => (
                           <tr key={project._id}>
                             <td className="fw-semibold">{project.title}</td>
                             <td>{project.studentId?.name || 'N/A'}</td>
@@ -1118,6 +1306,15 @@ const StaffDashboard = () => {
                         ))}
                     </tbody>
                   </Table>
+                  {totalEvalPages > 1 && (
+                    <div className="d-flex justify-content-center mt-4">
+                      <div className="d-flex gap-2 align-items-center">
+                        <Button variant="outline-primary" size="sm" onClick={() => setEvaluationPage(prev => Math.max(prev - 1, 1))} disabled={evaluationPage === 1}>Previous</Button>
+                        <span className="px-2 small fw-semibold">Page {evaluationPage} of {totalEvalPages}</span>
+                        <Button variant="outline-primary" size="sm" onClick={() => setEvaluationPage(prev => Math.min(prev + 1, totalEvalPages))} disabled={evaluationPage === totalEvalPages}>Next</Button>
+                      </div>
+                    </div>
+                  )}
                 </Card.Body>
               </Card>
             </Col>
@@ -1131,6 +1328,38 @@ const StaffDashboard = () => {
               <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
                   <h5 className="fw-bold mb-4">📁 Document Reviews</h5>
+
+                  {documents.length > 0 && (
+                    <Row className="mb-4 g-2">
+                      <Col md={6}>
+                        <Form.Control 
+                          type="text" 
+                          placeholder="Search by file name or student name..." 
+                          value={docSearchQuery}
+                          onChange={(e) => setDocSearchQuery(e.target.value)}
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Select 
+                          value={docFilterStatus}
+                          onChange={(e) => setDocFilterStatus(e.target.value)}
+                        >
+                          <option value="All">All Statuses</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Approved">Approved</option>
+                          <option value="Rejected">Rejected</option>
+                        </Form.Select>
+                      </Col>
+                      <Col md={2}>
+                        <Form.Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                          <option value={5}>5 / page</option>
+                          <option value={10}>10 / page</option>
+                          <option value={20}>20 / page</option>
+                        </Form.Select>
+                      </Col>
+                    </Row>
+                  )}
+
                   <Table hover responsive>
                     <thead>
                       <tr>
@@ -1144,7 +1373,11 @@ const StaffDashboard = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {documents.map(doc => (
+                      {currentDocuments.length === 0 ? (
+                        <tr>
+                          <td colSpan="7" className="text-center py-4 text-muted">No matching documents found.</td>
+                        </tr>
+                      ) : currentDocuments.map(doc => (
                         <tr key={doc._id || doc.id}>
                           <td><Badge bg="info">{doc.type?.toUpperCase() || 'DOC'}</Badge></td>
                           <td className="fw-semibold">{doc.fileName}</td>
@@ -1189,6 +1422,15 @@ const StaffDashboard = () => {
                       ))}
                     </tbody>
                   </Table>
+                  {totalDocPages > 1 && (
+                    <div className="d-flex justify-content-center mt-4">
+                      <div className="d-flex gap-2 align-items-center">
+                        <Button variant="outline-primary" size="sm" onClick={() => setDocPage(prev => Math.max(prev - 1, 1))} disabled={docPage === 1}>Previous</Button>
+                        <span className="px-2 small fw-semibold">Page {docPage} of {totalDocPages}</span>
+                        <Button variant="outline-primary" size="sm" onClick={() => setDocPage(prev => Math.min(prev + 1, totalDocPages))} disabled={docPage === totalDocPages}>Next</Button>
+                      </div>
+                    </div>
+                  )}
                 </Card.Body>
               </Card>
             </Col>

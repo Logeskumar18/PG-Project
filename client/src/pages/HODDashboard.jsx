@@ -3,7 +3,6 @@ import ConfirmLogoutModal from '../components/ConfirmLogoutModal';
 import { DEPARTMENTS } from '../constants/departments';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge, Table, ProgressBar, Spinner } from 'react-bootstrap';
 import api from '../services/api';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -40,13 +39,15 @@ const HODDashboard = () => {
     });
     const [staffErrors, setStaffErrors] = useState({});
   const { user, logout } = useAuth();
-const { theme, toggleTheme, getColor } = useTheme();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
+
+  const [theme, setTheme] = useState('light');
+  const toggleTheme = () => setTheme(prev => prev === 'light' ? 'dark' : 'light');
 
   // State for data from API
   const [stats, setStats] = useState({
@@ -84,14 +85,87 @@ const { theme, toggleTheme, getColor } = useTheme();
 
   // Search filter state and logic for All Projects
   const [searchProject, setSearchProject] = useState('');
+  const [projectFilterStatus, setProjectFilterStatus] = useState('All');
   const filteredProjects = projects.filter(project => {
     const search = searchProject.toLowerCase();
-    return (
+    const matchesSearch = (
       project.title?.toLowerCase().includes(search) ||
       project.studentId?.name?.toLowerCase().includes(search) ||
       project.assignedGuideId?.name?.toLowerCase().includes(search)
     );
+    const status = project.approvalStatus || project.status || 'Pending';
+    const matchesStatus = projectFilterStatus === 'All' || status === projectFilterStatus;
+    return matchesSearch && matchesStatus;
   });
+
+  const [staffSearch, setStaffSearch] = useState('');
+  const [staffFilterDept, setStaffFilterDept] = useState('All');
+  const filteredStaff = staff.filter(member => {
+    const search = staffSearch.toLowerCase();
+    const matchesSearch = (
+      member.name?.toLowerCase().includes(search) ||
+      member.employeeId?.toLowerCase().includes(search) ||
+      member.email?.toLowerCase().includes(search)
+    );
+    const matchesDept = staffFilterDept === 'All' || member.department === staffFilterDept;
+    return matchesSearch && matchesDept;
+  });
+
+  const [studentSearch, setStudentSearch] = useState('');
+  const [studentFilterDept, setStudentFilterDept] = useState('All');
+  const filteredStudents = students.filter(student => {
+    const search = studentSearch.toLowerCase();
+    const matchesSearch = (
+      student.name?.toLowerCase().includes(search) ||
+      student.studentId?.toLowerCase().includes(search) ||
+      student.email?.toLowerCase().includes(search)
+    );
+    const matchesDept = studentFilterDept === 'All' || student.department === studentFilterDept;
+    return matchesSearch && matchesDept;
+  });
+
+  const [evaluationSearch, setEvaluationSearch] = useState('');
+  const filteredEvaluations = evaluations.filter(ev => {
+    const search = evaluationSearch.toLowerCase();
+    const evalId = ev.evaluatorId?._id || ev.evaluatorId || ev.staffId?._id || ev.staffId;
+    const evaluatorName = ev.evaluatorId?.name || ev.staffId?.name || staff.find(s => s._id === evalId || s.id === evalId)?.name || 'N/A';
+    return (
+      ev.studentId?.name?.toLowerCase().includes(search) ||
+      ev.projectId?.title?.toLowerCase().includes(search) ||
+      evaluatorName.toLowerCase().includes(search)
+    );
+  });
+
+  const [projectPage, setProjectPage] = useState(1);
+  const [staffPage, setStaffPage] = useState(1);
+  const [studentPage, setStudentPage] = useState(1);
+  const [evaluationPage, setEvaluationPage] = useState(1);
+  const [pageSize, setPageSize] = useState(5);
+
+  useEffect(() => { setProjectPage(1); }, [searchProject, projectFilterStatus, pageSize]);
+  useEffect(() => { setStaffPage(1); }, [staffSearch, staffFilterDept, pageSize]);
+  useEffect(() => { setStudentPage(1); }, [studentSearch, studentFilterDept, pageSize]);
+  useEffect(() => { setEvaluationPage(1); }, [evaluationSearch, pageSize]);
+
+  const indexOfLastProject = projectPage * pageSize;
+  const indexOfFirstProject = indexOfLastProject - pageSize;
+  const currentProjects = filteredProjects.slice(indexOfFirstProject, indexOfLastProject);
+  const totalProjectPages = Math.ceil(filteredProjects.length / pageSize);
+
+  const indexOfLastStaff = staffPage * pageSize;
+  const indexOfFirstStaff = indexOfLastStaff - pageSize;
+  const currentStaff = filteredStaff.slice(indexOfFirstStaff, indexOfLastStaff);
+  const totalStaffPages = Math.ceil(filteredStaff.length / pageSize);
+
+  const indexOfLastStudent = studentPage * pageSize;
+  const indexOfFirstStudent = indexOfLastStudent - pageSize;
+  const currentStudents = filteredStudents.slice(indexOfFirstStudent, indexOfLastStudent);
+  const totalStudentPages = Math.ceil(filteredStudents.length / pageSize);
+
+  const indexOfLastEvaluation = evaluationPage * pageSize;
+  const indexOfFirstEvaluation = indexOfLastEvaluation - pageSize;
+  const currentEvaluations = filteredEvaluations.slice(indexOfFirstEvaluation, indexOfLastEvaluation);
+  const totalEvaluationPages = Math.ceil(filteredEvaluations.length / pageSize);
 
   const fetchMessages = async () => {
     try {
@@ -596,24 +670,23 @@ const { theme, toggleTheme, getColor } = useTheme();
 
   if (initialLoading) {
     return (
-      <div className="min-vh-100 d-flex justify-content-center align-items-center" style={{ backgroundColor: getColor('bgPrimary') }}>
+      <div className="min-vh-100 d-flex justify-content-center align-items-center bg-light">
         <Spinner animation="border" variant="primary" />
       </div>
     );
   }
 
   return (
-    <div className={`min-vh-100 ${theme === 'dark' ? 'bg-dark text-light' : 'bg-light text-dark'}`} style={{ backgroundColor: getColor('bgPrimary') }}>
+    <div className="min-vh-100 bg-light text-dark">
       {/* Navbar */}
-      <div className={`shadow-sm py-3 sticky-top ${theme === 'dark' ? 'bg-dark border-bottom border-secondary' : 'bg-white'}`}>
+      <div className="shadow-sm py-3 sticky-top bg-white">
         <Container fluid className="px-4">
           <div className="d-flex justify-content-between align-items-center">
             <div>
               <h4 className="fw-bold mb-0" style={{ color: '#f093fb' }}>👨‍💼 HOD Dashboard</h4>
-              <small className={theme === 'dark' ? 'text-light' : 'text-muted'}>Welcome, {user?.name}</small>
+              <small className="text-muted">Welcome, {user?.name}</small>
             </div>
             <div className="d-flex align-items-center gap-3">
-              <Button variant={theme === 'dark' ? 'outline-light' : 'outline-dark'} size="sm" onClick={toggleTheme} className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px', padding: 0 }}>{theme === 'dark' ? '☀️' : '🌙'}</Button>
               <Button variant="danger" size="sm" onClick={handleLogoutClick}>Logout</Button>
             </div>
             <ConfirmLogoutModal
@@ -827,21 +900,41 @@ const { theme, toggleTheme, getColor } = useTheme();
                     <h5 className="fw-bold mb-0">📋 All Projects</h5>
                   </div>
                   {/* Search Filter */}
-                  <div className="mb-3">
-                    <input
-                      type="text"
-                      className="form-control"
-                      placeholder="Search projects by title, student, or guide..."
-                      value={searchProject || ''}
-                      onChange={e => setSearchProject(e.target.value)}
-                      style={{ maxWidth: 400 }}
-                    />
-                  </div>
+                  {projects.length > 0 && (
+                    <Row className="mb-4 g-2">
+                      <Col md={6}>
+                        <Form.Control
+                          type="text"
+                          placeholder="Search projects by title, student, or guide..."
+                          value={searchProject || ''}
+                          onChange={e => setSearchProject(e.target.value)}
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Select 
+                          value={projectFilterStatus}
+                          onChange={(e) => setProjectFilterStatus(e.target.value)}
+                        >
+                          <option value="All">All Statuses</option>
+                          <option value="Pending">Pending</option>
+                          <option value="Approved">Approved</option>
+                          <option value="Rejected">Rejected</option>
+                        </Form.Select>
+                      </Col>
+                      <Col md={2}>
+                        <Form.Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                          <option value={5}>5 / page</option>
+                          <option value={10}>10 / page</option>
+                          <option value={20}>20 / page</option>
+                        </Form.Select>
+                      </Col>
+                    </Row>
+                  )}
                   <div className="d-flex flex-column gap-3">
-                    {filteredProjects.length === 0 ? (
+                    {currentProjects.length === 0 ? (
                       <div className="text-center text-muted py-4">No projects found</div>
                     ) : (
-                      filteredProjects.map(project => (
+                      currentProjects.map(project => (
                         <div key={project._id} className="p-3 border rounded-3">
                           <div className="d-flex justify-content-between align-items-start mb-2">
                             <div className="flex-grow-1">
@@ -865,6 +958,15 @@ const { theme, toggleTheme, getColor } = useTheme();
                       ))
                     )}
                   </div>
+                  {totalProjectPages > 1 && (
+                    <div className="d-flex justify-content-center mt-4">
+                      <div className="d-flex gap-2 align-items-center">
+                        <Button variant="outline-primary" size="sm" onClick={() => setProjectPage(prev => Math.max(prev - 1, 1))} disabled={projectPage === 1}>Previous</Button>
+                        <span className="px-2 small fw-semibold">Page {projectPage} of {totalProjectPages}</span>
+                        <Button variant="outline-primary" size="sm" onClick={() => setProjectPage(prev => Math.min(prev + 1, totalProjectPages))} disabled={projectPage === totalProjectPages}>Next</Button>
+                      </div>
+                    </div>
+                  )}
                 </Card.Body>
               </Card>
             </Col>
@@ -888,6 +990,34 @@ const { theme, toggleTheme, getColor } = useTheme();
                       + Create Staff
                     </Button>
                   </div>
+                  {staff.length > 0 && (
+                    <Row className="mb-4 g-2">
+                      <Col md={6}>
+                        <Form.Control 
+                          type="text" 
+                          placeholder="Search by name, employee ID, or email..." 
+                          value={staffSearch}
+                          onChange={(e) => setStaffSearch(e.target.value)}
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Select 
+                          value={staffFilterDept}
+                          onChange={(e) => setStaffFilterDept(e.target.value)}
+                        >
+                          <option value="All">All Departments</option>
+                          {DEPARTMENTS.map(dep => <option key={dep} value={dep}>{dep}</option>)}
+                        </Form.Select>
+                      </Col>
+                      <Col md={2}>
+                        <Form.Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                          <option value={5}>5 / page</option>
+                          <option value={10}>10 / page</option>
+                          <option value={20}>20 / page</option>
+                        </Form.Select>
+                      </Col>
+                    </Row>
+                  )}
                   {loading ? (
                     <div className="text-center text-muted">Loading...</div>
                   ) : staff.length === 0 ? (
@@ -904,7 +1034,11 @@ const { theme, toggleTheme, getColor } = useTheme();
                         </tr>
                       </thead>
                       <tbody>
-                        {staff.map(member => (
+                        {currentStaff.length === 0 ? (
+                          <tr>
+                            <td colSpan="5" className="text-center py-4 text-muted">No matching staff found.</td>
+                          </tr>
+                        ) : currentStaff.map(member => (
                           <tr key={member._id}>
                             <td className="fw-semibold">{member.name}</td>
                             <td>{member.employeeId}</td>
@@ -923,6 +1057,15 @@ const { theme, toggleTheme, getColor } = useTheme();
                       </tbody>
                     </Table>
                   )}
+                  {totalStaffPages > 1 && (
+                    <div className="d-flex justify-content-center mt-4">
+                      <div className="d-flex gap-2 align-items-center">
+                        <Button variant="outline-primary" size="sm" onClick={() => setStaffPage(prev => Math.max(prev - 1, 1))} disabled={staffPage === 1}>Previous</Button>
+                        <span className="px-2 small fw-semibold">Page {staffPage} of {totalStaffPages}</span>
+                        <Button variant="outline-primary" size="sm" onClick={() => setStaffPage(prev => Math.min(prev + 1, totalStaffPages))} disabled={staffPage === totalStaffPages}>Next</Button>
+                      </div>
+                    </div>
+                  )}
                 </Card.Body>
               </Card>
             </Col>
@@ -936,6 +1079,34 @@ const { theme, toggleTheme, getColor } = useTheme();
               <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
                   <h5 className="fw-bold mb-4">👨‍🎓 Students ({students.length})</h5>
+                  {students.length > 0 && (
+                    <Row className="mb-4 g-2">
+                      <Col md={6}>
+                        <Form.Control 
+                          type="text" 
+                          placeholder="Search by name, student ID, or email..." 
+                          value={studentSearch}
+                          onChange={(e) => setStudentSearch(e.target.value)}
+                        />
+                      </Col>
+                      <Col md={4}>
+                        <Form.Select 
+                          value={studentFilterDept}
+                          onChange={(e) => setStudentFilterDept(e.target.value)}
+                        >
+                          <option value="All">All Departments</option>
+                          {DEPARTMENTS.map(dep => <option key={dep} value={dep}>{dep}</option>)}
+                        </Form.Select>
+                      </Col>
+                      <Col md={2}>
+                        <Form.Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                          <option value={5}>5 / page</option>
+                          <option value={10}>10 / page</option>
+                          <option value={20}>20 / page</option>
+                        </Form.Select>
+                      </Col>
+                    </Row>
+                  )}
                   {loading ? (
                     <div className="text-center text-muted">Loading...</div>
                   ) : students.length === 0 ? (
@@ -952,7 +1123,11 @@ const { theme, toggleTheme, getColor } = useTheme();
                         </tr>
                       </thead>
                       <tbody>
-                        {students.map(student => (
+                        {currentStudents.length === 0 ? (
+                          <tr>
+                            <td colSpan="5" className="text-center py-4 text-muted">No matching students found.</td>
+                          </tr>
+                        ) : currentStudents.map(student => (
                           <tr key={student._id}>
                             <td className="fw-semibold">{student.name}</td>
                             <td>{student.studentId}</td>
@@ -970,6 +1145,15 @@ const { theme, toggleTheme, getColor } = useTheme();
                         ))}
                       </tbody>
                     </Table>
+                  )}
+                  {totalStudentPages > 1 && (
+                    <div className="d-flex justify-content-center mt-4">
+                      <div className="d-flex gap-2 align-items-center">
+                        <Button variant="outline-primary" size="sm" onClick={() => setStudentPage(prev => Math.max(prev - 1, 1))} disabled={studentPage === 1}>Previous</Button>
+                        <span className="px-2 small fw-semibold">Page {studentPage} of {totalStudentPages}</span>
+                        <Button variant="outline-primary" size="sm" onClick={() => setStudentPage(prev => Math.min(prev + 1, totalStudentPages))} disabled={studentPage === totalStudentPages}>Next</Button>
+                      </div>
+                    </div>
                   )}
                 </Card.Body>
               </Card>
@@ -1094,6 +1278,25 @@ const { theme, toggleTheme, getColor } = useTheme();
               <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
                   <h5 className="fw-bold mb-4">📝 Student Evaluations</h5>
+                  {evaluations.length > 0 && (
+                    <Row className="mb-4 g-2">
+                      <Col md={10}>
+                        <Form.Control 
+                          type="text" 
+                          placeholder="Search by student name, project title, or evaluator..." 
+                          value={evaluationSearch}
+                          onChange={(e) => setEvaluationSearch(e.target.value)}
+                        />
+                      </Col>
+                      <Col md={2}>
+                        <Form.Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                          <option value={5}>5 / page</option>
+                          <option value={10}>10 / page</option>
+                          <option value={20}>20 / page</option>
+                        </Form.Select>
+                      </Col>
+                    </Row>
+                  )}
                   <Table hover responsive>
                     <thead>
                       <tr>
@@ -1105,7 +1308,11 @@ const { theme, toggleTheme, getColor } = useTheme();
                       </tr>
                     </thead>
                     <tbody>
-                      {evaluations.map(ev => {
+                      {currentEvaluations.length === 0 ? (
+                        <tr>
+                          <td colSpan="5" className="text-center py-4 text-muted">No matching evaluations found.</td>
+                        </tr>
+                      ) : currentEvaluations.map(ev => {
                         const evalId = ev.evaluatorId?._id || ev.evaluatorId || ev.staffId?._id || ev.staffId;
                         const evaluatorName = ev.evaluatorId?.name || ev.staffId?.name || staff.find(s => s._id === evalId || s.id === evalId)?.name || 'N/A';
                         
@@ -1121,6 +1328,15 @@ const { theme, toggleTheme, getColor } = useTheme();
                       })}
                     </tbody>
                   </Table>
+                  {totalEvaluationPages > 1 && (
+                    <div className="d-flex justify-content-center mt-4">
+                      <div className="d-flex gap-2 align-items-center">
+                        <Button variant="outline-primary" size="sm" onClick={() => setEvaluationPage(prev => Math.max(prev - 1, 1))} disabled={evaluationPage === 1}>Previous</Button>
+                        <span className="px-2 small fw-semibold">Page {evaluationPage} of {totalEvaluationPages}</span>
+                        <Button variant="outline-primary" size="sm" onClick={() => setEvaluationPage(prev => Math.min(prev + 1, totalEvaluationPages))} disabled={evaluationPage === totalEvaluationPages}>Next</Button>
+                      </div>
+                    </div>
+                  )}
                 </Card.Body>
               </Card>
             </Col>

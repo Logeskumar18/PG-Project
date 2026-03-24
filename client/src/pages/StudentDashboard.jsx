@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import ConfirmLogoutModal from '../components/ConfirmLogoutModal';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { useTheme } from '../context/ThemeContext';
 import { Container, Row, Col, Card, Button, Form, Alert, Modal, Badge } from 'react-bootstrap';
 import ProjectForm from '../components/ProjectForm.jsx';
 import api from '../services/api';
@@ -17,7 +16,6 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 const StudentDashboard = () => {
   const { user, logout } = useAuth();
-  const { theme, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
   const [showProjectModal, setShowProjectModal] = useState(false);
@@ -509,45 +507,16 @@ const StudentDashboard = () => {
   const unreadMessagesCount = messages.filter(m => !m.isRead).length;
 
   return (
-    <div className={`min-vh-100 ${theme === 'dark' ? 'bg-dark text-light' : 'bg-light text-dark'}`} style={theme === 'dark' ? { background: '#121212' } : { background: '#f8f9fa' }}>
-      <style>
-        {`
-          @media print {
-            body * {
-              visibility: hidden;
-            }
-            #printable-evaluation, #printable-evaluation * {
-              visibility: visible;
-            }
-            #printable-evaluation {
-              position: absolute;
-              left: 0;
-              top: 0;
-              width: 100%;
-            }
-            .no-print {
-              display: none !important;
-            }
-          }
-          @keyframes slideUpFade {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
-          }
-          .profile-card-animate {
-            animation: slideUpFade 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-          }
-        `}
-      </style>
+      <div className="min-vh-100 bg-light text-dark" style={{ background: '#f8f9fa' }}>
       {/* Navbar */}
-      <div className={`shadow-sm py-3 sticky-top ${theme === 'dark' ? 'bg-dark border-bottom border-secondary' : 'bg-white'}`}>
+      <div className="shadow-sm py-3 sticky-top bg-white">
         <Container fluid className="px-4">
           <div className="d-flex justify-content-between align-items-center">
             <div>
               <h4 className="fw-bold mb-0" style={{ color: '#667eea' }}>📚 Student Dashboard</h4>
-              <small className={theme === 'dark' ? 'text-light' : 'text-muted'}>Welcome, {user?.name}</small>
+              <small className="text-muted">Welcome, {user?.name}</small>
             </div>
             <div className="d-flex align-items-center gap-3">
-              <Button variant={theme === 'dark' ? 'outline-light' : 'outline-dark'} size="sm" onClick={toggleTheme} className="rounded-circle d-flex align-items-center justify-content-center" style={{ width: '32px', height: '32px', padding: 0 }}>{theme === 'dark' ? '☀️' : '🌙'}</Button>
               <Button variant="danger" size="sm" onClick={handleLogoutClick}>Logout</Button>
             </div>
                 <ConfirmLogoutModal
@@ -1183,13 +1152,17 @@ const StudentDashboard = () => {
                   <div className="d-flex justify-content-between align-items-center mb-4 no-print">
                     <h5 className="fw-bold mb-0">📝 Project Evaluation</h5>
                     <div className="d-flex gap-2">
-                      <Button variant="outline-primary" size="sm" onClick={() => window.print()}>🖨️ Print Marksheet</Button>
-                      <Button variant="outline-success" size="sm" onClick={() => downloadPDF(document.getElementById('printable-evaluation'), `Marksheet_${user?.studentId || 'student'}.pdf`)}>⬇️ Download PDF</Button>
+                      {evaluation && evaluation.totalMarks !== undefined && (
+                        <>
+                          <Button variant="outline-primary" size="sm" onClick={() => window.print()}>🖨️ Print Marksheet</Button>
+                          <Button variant="outline-success" size="sm" onClick={() => downloadPDF(document.getElementById('printable-evaluation'), `Marksheet_${user?.studentId || 'student'}.pdf`)}>⬇️ Download PDF</Button>
+                        </>
+                      )}
                       <Button variant="outline-secondary" size="sm" onClick={fetchEvaluation}>🔄 Refresh</Button>
                     </div>
                   </div>
                   
-                  {!evaluation ? (
+                  {!evaluation || evaluation.totalMarks === undefined ? (
                     <div className="text-center py-5 text-muted">
                       <p className="mb-0">Not evaluated yet</p>
                       <small>Your marks will appear here once your guide evaluates your project.</small>
