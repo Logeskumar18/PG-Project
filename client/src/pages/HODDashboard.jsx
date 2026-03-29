@@ -676,6 +676,21 @@ const HODDashboard = () => {
     );
   }
 
+  const getDaysRemaining = (dateString) => {
+    const deadlineDate = new Date(dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadlineDate.setHours(0, 0, 0, 0);
+    const diffTime = deadlineDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    if (diffDays === 0) return "Due today";
+    if (diffDays === 1) return "Due tomorrow";
+    if (diffDays > 1) return `Due in ${diffDays} days`;
+    return "Expired";
+  };
+
+  const approvedProjectsCount = projects.filter(p => p.approvalStatus === 'Approved').length;
+
   return (
     <div className="min-vh-100 bg-light text-dark">
       {/* Navbar */}
@@ -790,9 +805,9 @@ const HODDashboard = () => {
             <Col lg={3} md={6}>
               <Card className="border-0 shadow-sm h-100">
                 <Card.Body className="text-center p-4">
-                  <h5 style={{ color: '#667eea' }} className="fw-bold">📚 Total Projects</h5>
-                  <h2 className="fw-bold my-3">{stats.totalProjects}</h2>
-                  <small className="text-muted">All registered projects</small>
+                  <h5 style={{ color: '#667eea' }} className="fw-bold">📚 Approved Projects</h5>
+                  <h2 className="fw-bold my-3">{approvedProjectsCount}</h2>
+                  <small className="text-muted">Projects with approved status</small>
                 </Card.Body>
               </Card>
             </Col>
@@ -1235,11 +1250,11 @@ const HODDashboard = () => {
                             <p className="text-muted mb-0 small">{deadline.description}</p>
                           </div>
                           <div className="text-end d-flex align-items-center gap-3">
-                            <div>
-                              <div className="fw-bold text-danger fs-5">{new Date(deadline.date).toLocaleDateString()}</div>
-                              <small className="text-muted">
-                                {Math.ceil((new Date(deadline.date) - new Date()) / (1000 * 60 * 60 * 24))} days left
-                              </small>
+                            <div className="text-end">
+                              <div className="fw-bold text-danger fs-5">
+                                {new Date(deadline.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                              </div>
+                              <span className="badge bg-danger mt-1">{getDaysRemaining(deadline.date)}</span>
                             </div>
                             <div className="d-flex gap-2">
                               <Button variant="outline-primary" size="sm" onClick={() => {

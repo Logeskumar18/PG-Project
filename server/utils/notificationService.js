@@ -1,10 +1,12 @@
 import Notification from '../models/Notification.js';
 import Project from '../models/Project.js';
 import Milestone from '../models/Milestone.js';
+import Deadline from '../models/Deadline.js';
 import Announcement from '../models/Announcement.js';
 import Document from '../models/Document.js';
 import Progress from '../models/Progress.js';
 import Staff from '../models/Staff.js';
+import Student from '../models/Student.js';
 import { sendMail } from './mailer.js';
 
 // Notification creator utility
@@ -427,6 +429,38 @@ export const sendDeadlineReminders = async () => {
   const dayAfter = new Date(tomorrow);
   dayAfter.setDate(dayAfter.getDate() + 1);
 
+  // Find global deadlines due tomorrow and notify all students
+  const upcomingGlobalDeadlines = await Deadline.find({
+    date: { $gte: tomorrow, $lt: dayAfter }
+  }).lean();
+
+  if (upcomingGlobalDeadlines.length > 0) {
+    const allStudents = await Student.find({}).select('_id').lean();
+    const studentIds = allStudents.map(s => s._id);
+    
+    if (studentIds.length > 0) {
+      let notifications = [];
+      upcomingGlobalDeadlines.forEach(deadline => {
+        const deadlineTitle = deadline.title === 'Other' ? deadline.customTitle : deadline.title;
+        studentIds.forEach(studentId => {
+          notifications.push({
+            userId: studentId,
+            type: 'DEADLINE_REMINDER',
+            title: '⏰ Deadline Reminder',
+            message: `The deadline for "${deadlineTitle}" is tomorrow.`,
+            relatedTo: { type: 'Deadline', referenceId: deadline._id },
+            priority: 'High',
+            actionUrl: `/dashboard/student?tab=overview`,
+            expiresAt: deadline.date
+          });
+        });
+      });
+
+      if (notifications.length > 0) {
+        await createBulkNotifications(notifications);
+      }
+    }
+  }
   // Find milestones due tomorrow
   const upcomingMilestones = await Milestone.find({
     dueDate: { $gte: tomorrow, $lt: dayAfter },
@@ -478,7 +512,7 @@ export const sendDeadlineReminders = async () => {
     // This would need user IDs from the announcement's targetAudience
   }
 
-  console.log(`Sent ${upcomingMilestones.length} milestone and ${pendingDocuments.length} document deadline reminders`);
+  console.log(`Sent reminders for ${upcomingGlobalDeadlines.length} global deadlines, ${upcomingMilestones.length} milestones, and ${pendingDocuments.length} document reviews.`);
 
   // Find pending documents uploaded more than 3 days ago
   const threeDaysAgo = new Date();

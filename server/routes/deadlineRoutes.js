@@ -7,7 +7,16 @@ const router = express.Router();
 // Get all global deadlines (accessible by all authenticated users)
 router.get('/', protect, async (req, res) => {
   try {
-    const deadlines = await Deadline.find().sort({ date: 1 });
+    const query = {};
+    
+    // If the user is a Student, filter out expired deadlines (keep today and future)
+    if (req.user && req.user.role === 'Student') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Start of the current day
+      query.date = { $gte: today };
+    }
+
+    const deadlines = await Deadline.find(query).sort({ date: 1 });
     res.json({ success: true, data: deadlines });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });

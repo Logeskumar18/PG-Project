@@ -13,7 +13,7 @@ import 'react-pdf/dist/Page/TextLayer.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
-
+const STAGES = ['Proposal Submitted', 'Proposal Approved', 'Development', 'Mid Review', 'Testing', 'Final Submission'];
 const StudentDashboard = () => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -53,6 +53,19 @@ const StudentDashboard = () => {
   // Document Search & Filter State
   const [docSearchQuery, setDocSearchQuery] = useState('');
   const [docFilterStatus, setDocFilterStatus] = useState('All');
+  const [docSortBy, setDocSortBy] = useState('date-desc');
+  const [docPage, setDocPage] = useState(1);
+  const [pageSize, setPageSize] = useState(3); // Documents per page
+
+  // Project Search & Filter State
+  const [projectSearchQuery, setProjectSearchQuery] = useState('');
+  const [projectFilterStatus, setProjectFilterStatus] = useState('All');
+  const [projectSortBy, setProjectSortBy] = useState('date-desc');
+  const [projectPage, setProjectPage] = useState(1);
+  const [projectPageSize, setProjectPageSize] = useState(3); // Projects per page
+
+  // Announcement Filter State
+  const [announcementFilter, setAnnouncementFilter] = useState('All');
 
   // PDF Viewer State
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -496,6 +509,14 @@ const StudentDashboard = () => {
     setShowLogoutModal(false);
   };
 
+  useEffect(() => {
+    setDocPage(1);
+  }, [docSearchQuery, docFilterStatus, pageSize, docSortBy]);
+
+  useEffect(() => {
+    setProjectPage(1);
+  }, [projectSearchQuery, projectFilterStatus, projectPageSize, projectSortBy]);
+
   const filteredDocuments = documents.filter(doc => {
     const matchesSearch = (doc.fileName || '').toLowerCase().includes(docSearchQuery.toLowerCase()) || 
                           (doc.type || '').toLowerCase().includes(docSearchQuery.toLowerCase());
@@ -504,7 +525,95 @@ const StudentDashboard = () => {
     return matchesSearch && matchesStatus;
   });
 
+  const sortedDocuments = [...filteredDocuments].sort((a, b) => {
+    const statusA = a.reviewStatus || 'Pending';
+    const statusB = b.reviewStatus || 'Pending';
+    const dateA = new Date(a.uploadedAt);
+    const dateB = new Date(b.uploadedAt);
+
+    switch (docSortBy) {
+      case 'date-asc':
+        return dateA - dateB;
+      case 'status-asc':
+        return statusA.localeCompare(statusB);
+      case 'status-desc':
+        return statusB.localeCompare(statusA);
+      case 'date-desc':
+      default:
+        return dateB - dateA;
+    }
+  });
+
+  const indexOfLastDoc = docPage * pageSize;
+  const indexOfFirstDoc = indexOfLastDoc - pageSize;
+  const currentDocuments = sortedDocuments.slice(indexOfFirstDoc, indexOfLastDoc);
+  const totalDocPages = Math.ceil(sortedDocuments.length / pageSize);
+
+  const filteredProjects = projects.filter(project => {
+    const matchesSearch = (project.title || '').toLowerCase().includes(projectSearchQuery.toLowerCase());
+    const status = project.approvalStatus || project.status || 'Pending';
+    const matchesStatus = projectFilterStatus === 'All' || status === projectFilterStatus;
+    return matchesSearch && matchesStatus;
+  });
+
+  const sortedProjects = [...filteredProjects].sort((a, b) => {
+    const statusA = a.approvalStatus || a.status || 'Pending';
+    const statusB = b.approvalStatus || b.status || 'Pending';
+    const dateA = new Date(a.submissionDate || a.submittedAt || a.createdAt || 0);
+    const dateB = new Date(b.submissionDate || b.submittedAt || b.createdAt || 0);
+
+    switch (projectSortBy) {
+      case 'date-asc':
+        return dateA - dateB;
+      case 'status-asc':
+        return statusA.localeCompare(statusB);
+      case 'status-desc':
+        return statusB.localeCompare(statusA);
+      case 'date-desc':
+      default:
+        return dateB - dateA;
+    }
+  });
+
+  const indexOfLastProject = projectPage * projectPageSize;
+  const indexOfFirstProject = indexOfLastProject - projectPageSize;
+  const currentProjects = sortedProjects.slice(indexOfFirstProject, indexOfLastProject);
+  const totalProjectPages = Math.ceil(sortedProjects.length / projectPageSize);
+
+  const filteredAnnouncements = announcements.filter(announcement => {
+    if (announcementFilter === 'All') return true;
+    return announcement.type === announcementFilter;
+  });
+
   const unreadMessagesCount = messages.filter(m => !m.isRead).length;
+
+  const getDaysRemaining = (dateString) => {
+    const deadlineDate = new Date(dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadlineDate.setHours(0, 0, 0, 0);
+    const diffTime = deadlineDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    if (diffDays === 0) return "Due today";
+    if (diffDays === 1) return "Due tomorrow";
+    if (diffDays > 1) return `Due in ${diffDays} days`;
+    return "Expired";
+  };
+
+  const approvedProjects = projects.filter(p => p.approvalStatus === 'Approved');
+  const approvedProjectIds = approvedProjects.map(p => p._id);
+  
+  const documentsForApprovedProjects = documents.filter(doc => {
+    const docProjectId = doc.projectId?._id || doc.projectId;
+    return approvedProjectIds.includes(docProjectId);
+  });
+
+  // The progressUpdates array is not populated in the current code, so this will be 0.
+  // If it were populated, a similar filtering logic would apply.
+  const progressUpdatesForApprovedProjects = progressUpdates.filter(update => {
+    const updateProjectId = update.projectId?._id || update.projectId;
+    return approvedProjectIds.includes(updateProjectId);
+  });
 
   return (
       <div className="min-vh-100 bg-light text-dark" style={{ background: '#f8f9fa' }}>
@@ -725,23 +834,69 @@ const StudentDashboard = () => {
                   <Row className="g-3">
                     <Col sm={4}>
                       <div className="p-3 bg-light rounded-3 text-center border">
-                        <h3 className="fw-bold text-primary mb-1">{projects.length}</h3>
-                        <small className="text-muted fw-semibold">Projects</small>
+                        <h3 className="fw-bold text-primary mb-1">{approvedProjects.length}</h3>
+                        <small className="text-muted fw-semibold">Approved Projects</small>
                       </div>
                     </Col>
                     <Col sm={4}>
                       <div className="p-3 bg-light rounded-3 text-center border">
-                        <h3 className="fw-bold text-success mb-1">{documents.length}</h3>
+                        <h3 className="fw-bold text-success mb-1">{documentsForApprovedProjects.length}</h3>
                         <small className="text-muted fw-semibold">Documents</small>
                       </div>
                     </Col>
-                    <Col sm={4}>
-                      <div className="p-3 bg-light rounded-3 text-center border">
-                        <h3 className="fw-bold text-warning mb-1">{progressUpdates.length}</h3>
-                        <small className="text-muted fw-semibold">Updates</small>
-                      </div>
-                    </Col>
+                   
                   </Row>
+                </Card.Body>
+              </Card>
+            </Col>
+            <Col lg={12}>
+              <Card className="border-0 shadow-sm">
+                <Card.Body className="p-4">
+                  <h5 className="fw-bold mb-4">📈 Project Stage Tracker</h5>
+                  {approvedProjects.length === 0 ? (
+                    <div className="text-center text-muted py-4">Your project needs to be approved to see the stage tracker.</div>
+                  ) : (
+                    <div className="d-flex flex-column gap-4">
+                      {approvedProjects.map(project => {
+                        const currentStageIndex = STAGES.indexOf(project.stage || 'Proposal Approved');
+                        return (
+                          <div key={project._id} className="p-4 border rounded-3 bg-white shadow-sm">
+                            <div className="d-flex justify-content-between align-items-center mb-4">
+                              <div>
+                                <h6 className="fw-bold mb-0">{project.title}</h6>
+                                <small className="text-muted">Your current project stage</small>
+                              </div>
+                              <Badge bg="primary" className="p-2 fs-6">{project.stage || 'Proposal Approved'}</Badge>
+                            </div>
+                            
+                            <div className="position-relative mt-4 mb-2 mx-4">
+                              <div className="progress position-absolute w-100" style={{ height: '4px', top: '13px', zIndex: 0 }}>
+                                <div 
+                                  className="progress-bar bg-success transition-all" 
+                                  style={{ width: `${(Math.max(0, currentStageIndex) / (STAGES.length - 1)) * 100}%`, transition: 'width 0.5s ease-in-out' }}
+                                ></div>
+                              </div>
+                              <div className="d-flex justify-content-between position-relative" style={{ zIndex: 1 }}>
+                                {STAGES.map((stage, idx) => (
+                                  <div key={stage} className="d-flex flex-column align-items-center" style={{ width: '80px', marginLeft: idx === 0 ? '-40px' : '0', marginRight: idx === STAGES.length - 1 ? '-40px' : '0' }}>
+                                    <div 
+                                      className={`rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm ${idx <= currentStageIndex ? 'bg-success text-white' : 'bg-white text-muted border'}`}
+                                      style={{ width: '30px', height: '30px', fontSize: '12px', transition: 'all 0.3s ease' }}
+                                    >
+                                      {idx <= currentStageIndex ? '✓' : idx + 1}
+                                    </div>
+                                    <div className="text-center mt-2 text-wrap" style={{ fontSize: '0.75rem', lineHeight: '1.2', fontWeight: idx <= currentStageIndex ? '600' : 'normal', color: idx <= currentStageIndex ? '#198754' : '#6c757d' }}>
+                                      {stage}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </Card.Body>
               </Card>
             </Col>
@@ -813,7 +968,10 @@ const StudentDashboard = () => {
                             <p className="text-muted mb-0 small">{deadline.description}</p>
                           </div>
                           <div className="text-end">
-                            <div className="fw-bold text-danger">{new Date(deadline.date).toLocaleDateString()}</div>
+                            <div className="fw-bold text-danger">
+                              {new Date(deadline.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                            </div>
+                            <span className="badge bg-danger mt-1">{getDaysRemaining(deadline.date)}</span>
                           </div>
                         </div>
                       ))}
@@ -878,45 +1036,112 @@ const StudentDashboard = () => {
                   </Card.Body>
                 </Card>
               ) : (
-                <div className="d-flex flex-column gap-4">
-                  {projects.length > 0 && projects[0].approvalStatus === 'Rejected' && (
-                    <div className="text-end">
-                      <Button 
-                        className="fw-semibold text-white"
-                        style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none' }}
-                        onClick={() => setShowProjectModal(true)}
-                      >
-                        Submit New Project Proposal
-                      </Button>
+                <Card className="border-0 shadow-sm">
+                  <Card.Body className="p-4">
+                    <div className="d-flex justify-content-between align-items-center mb-4">
+                      <h5 className="fw-bold mb-0">📋 My Projects</h5>
+                      {projects.length > 0 && projects[0].approvalStatus === 'Rejected' && (
+                        <Button 
+                          className="fw-semibold text-white"
+                          style={{ background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none' }}
+                          onClick={() => setShowProjectModal(true)}
+                        >
+                          Submit New Project Proposal
+                        </Button>
+                      )}
                     </div>
-                  )}
-                  {projects.map((project) => (
-                    <Card key={project._id} className="border-0 shadow-sm">
-                      <Card.Body className="p-4">
-                        <div className="d-flex justify-content-between align-items-start mb-4 pb-3 border-bottom">
-                          <div>
-                            <h5 className="fw-bold mb-2">
-                              {project.isArchived && <Badge bg="secondary" className="me-2 align-middle">🗄️ Archived {project.academicYear}</Badge>}
-                              {project.title}
-                            </h5>
-                            <small className="text-muted">Submitted on {project.submissionDate ? new Date(project.submissionDate).toLocaleDateString() : (project.submittedAt ? new Date(project.submittedAt).toLocaleDateString() : 'N/A')}</small>
-                          </div>
-                          <span className={`badge ${project.approvalStatus === 'Approved' ? 'bg-success' : project.approvalStatus === 'Rejected' ? 'bg-danger' : 'bg-info'}`}>{project.approvalStatus || project.status}</span>
+
+                    {/* Search and Filter */}
+                    {projects.length > 0 && (
+                      <Row className="mb-4 g-2">
+                        <Col md={4}>
+                          <Form.Control 
+                            type="text" 
+                            placeholder="Search by title..." 
+                            value={projectSearchQuery}
+                            onChange={(e) => setProjectSearchQuery(e.target.value)}
+                          />
+                        </Col>
+                        <Col md={3}>
+                          <Form.Select 
+                            value={projectFilterStatus}
+                            onChange={(e) => setProjectFilterStatus(e.target.value)}
+                          >
+                            <option value="All">All Statuses</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Approved">Approved</option>
+                            <option value="Rejected">Rejected</option>
+                          </Form.Select>
+                        </Col>
+                        <Col md={3}>
+                          <Form.Select 
+                            value={projectSortBy}
+                            onChange={(e) => setProjectSortBy(e.target.value)}
+                          >
+                            <option value="date-desc">Most Recent</option>
+                            <option value="date-asc">Oldest First</option>
+                            <option value="status-asc">Status (A-Z)</option>
+                            <option value="status-desc">Status (Z-A)</option>
+                          </Form.Select>
+                        </Col>
+                        <Col md={2}>
+                            <Form.Select value={projectPageSize} onChange={(e) => setProjectPageSize(Number(e.target.value))}>
+                                <option value={3}>3 / page</option>
+                                <option value={5}>5 / page</option>
+                                <option value={10}>10 / page</option>
+                            </Form.Select>
+                        </Col>
+                      </Row>
+                    )}
+
+                    {currentProjects.length === 0 ? (
+                      <div className="text-center py-5 text-muted">
+                          <p className="mb-0">No matching projects found</p>
+                          <small>Try adjusting your search or filters</small>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="d-flex flex-column gap-4">
+                          {currentProjects.map((project) => (
+                            <Card key={project._id} className="border shadow-sm">
+                              <Card.Body className="p-4">
+                                <div className="d-flex justify-content-between align-items-start mb-4 pb-3 border-bottom">
+                                  <div>
+                                    <h5 className="fw-bold mb-2">
+                                      {project.isArchived && <Badge bg="secondary" className="me-2 align-middle">🗄️ Archived {project.academicYear}</Badge>}
+                                      {project.title}
+                                    </h5>
+                                    <small className="text-muted">Submitted on {project.submissionDate ? new Date(project.submissionDate).toLocaleDateString() : (project.submittedAt ? new Date(project.submittedAt).toLocaleDateString() : 'N/A')}</small>
+                                  </div>
+                                  <span className={`badge ${project.approvalStatus === 'Approved' ? 'bg-success' : project.approvalStatus === 'Rejected' ? 'bg-danger' : 'bg-info'}`}>{project.approvalStatus || project.status}</span>
+                                </div>
+                                <div className="mb-4">
+                                  <h6 className="fw-semibold mb-2">Description:</h6>
+                                  <p className="text-muted mb-0">{project.description}</p>
+                                </div>
+                                {project.approvalRemarks && (
+                                  <div className="mb-4">
+                                    <h6 className="fw-semibold mb-2">Staff Feedback:</h6>
+                                    <p className="text-muted mb-0">{project.approvalRemarks}</p>
+                                  </div>
+                                )}
+                              </Card.Body>
+                            </Card>
+                          ))}
                         </div>
-                        <div className="mb-4">
-                          <h6 className="fw-semibold mb-2">Description:</h6>
-                          <p className="text-muted mb-0">{project.description}</p>
-                        </div>
-                        {project.approvalRemarks && (
-                          <div className="mb-4">
-                            <h6 className="fw-semibold mb-2">Staff Feedback:</h6>
-                            <p className="text-muted mb-0">{project.approvalRemarks}</p>
+                        {totalProjectPages > 1 && (
+                          <div className="d-flex justify-content-center mt-4">
+                            <div className="d-flex gap-2 align-items-center">
+                              <Button variant="outline-primary" size="sm" onClick={() => setProjectPage(prev => Math.max(prev - 1, 1))} disabled={projectPage === 1}>Previous</Button>
+                              <span className="px-2 small fw-semibold">Page {projectPage} of {totalProjectPages}</span>
+                              <Button variant="outline-primary" size="sm" onClick={() => setProjectPage(prev => Math.min(prev + 1, totalProjectPages))} disabled={projectPage === totalProjectPages}>Next</Button>
+                            </div>
                           </div>
                         )}
-                      </Card.Body>
-                    </Card>
-                  ))}
-                </div>
+                      </>
+                    )}
+                  </Card.Body>
+                </Card>
               )}
             </Col>
           </Row>
@@ -934,7 +1159,7 @@ const StudentDashboard = () => {
                       <Form.Label>Document Type</Form.Label>
                       <Form.Select name="docType" required>
                         <option value="">Select Document Type</option>
-                        <option value="srs">SRS (Software Requirements)</option>
+                        <option value="srs">Abstract</option>
                         <option value="ppt">Presentation (PPT)</option>
                         <option value="report">Report</option>
                         <option value="code">Source Code</option>
@@ -979,7 +1204,7 @@ const StudentDashboard = () => {
                     {/* Search and Filter */}
                     {documents.length > 0 && (
                       <Row className="mb-3 g-2">
-                        <Col md={7}>
+                        <Col md={4}>
                           <Form.Control 
                             type="text" 
                             placeholder="Search by file name or type..." 
@@ -987,7 +1212,7 @@ const StudentDashboard = () => {
                             onChange={(e) => setDocSearchQuery(e.target.value)}
                           />
                         </Col>
-                        <Col md={5}>
+                        <Col md={3}>
                           <Form.Select 
                             value={docFilterStatus}
                             onChange={(e) => setDocFilterStatus(e.target.value)}
@@ -998,17 +1223,36 @@ const StudentDashboard = () => {
                             <option value="Rejected">Rejected</option>
                           </Form.Select>
                         </Col>
+                        <Col md={3}>
+                          <Form.Select 
+                            value={docSortBy}
+                            onChange={(e) => setDocSortBy(e.target.value)}
+                          >
+                            <option value="date-desc">Most Recent</option>
+                            <option value="date-asc">Oldest First</option>
+                            <option value="status-asc">Status (A-Z)</option>
+                            <option value="status-desc">Status (Z-A)</option>
+                          </Form.Select>
+                        </Col>
+                        <Col md={2}>
+                            <Form.Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                                <option value={3}>3 / page</option>
+                                <option value={5}>5 / page</option>
+                                <option value={10}>10 / page</option>
+                            </Form.Select>
+                        </Col>
                       </Row>
                     )}
 
-                    {filteredDocuments.length === 0 ? (
+                    {currentDocuments.length === 0 ? (
                     <div className="text-center py-5 text-muted">
                         <p className="mb-0">{documents.length === 0 ? 'No submissions yet' : 'No matching documents found'}</p>
                         <small>{documents.length === 0 ? 'Upload documents to track them here' : 'Try adjusting your search or filters'}</small>
                     </div>
                   ) : (
-                    <div className="d-flex flex-column gap-3">
-                        {filteredDocuments.map((doc) => (
+                    <>
+                      <div className="d-flex flex-column gap-3">
+                          {currentDocuments.map((doc) => (
                         <div key={doc._id} className="p-3 bg-light rounded-3">
                           <div className="d-flex justify-content-between mb-2">
                             <strong>{doc.fileName}</strong>
@@ -1031,7 +1275,17 @@ const StudentDashboard = () => {
                           </div>
                         </div>
                       ))}
-                    </div>
+                      </div>
+                      {totalDocPages > 1 && (
+                        <div className="d-flex justify-content-center mt-4">
+                          <div className="d-flex gap-2 align-items-center">
+                            <Button variant="outline-primary" size="sm" onClick={() => setDocPage(prev => Math.max(prev - 1, 1))} disabled={docPage === 1}>Previous</Button>
+                            <span className="px-2 small fw-semibold">Page {docPage} of {totalDocPages}</span>
+                            <Button variant="outline-primary" size="sm" onClick={() => setDocPage(prev => Math.min(prev + 1, totalDocPages))} disabled={docPage === totalDocPages}>Next</Button>
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </Card.Body>
               </Card>
@@ -1405,13 +1659,33 @@ const StudentDashboard = () => {
               <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
                   <h5 className="fw-bold mb-4">📢 Announcements</h5>
+                  <div className="d-flex justify-content-between align-items-center mb-4">
+                    <h5 className="fw-bold mb-0">📢 Announcements</h5>
+                    {announcements.length > 0 && (
+                      <div style={{ width: '200px' }}>
+                        <Form.Select 
+                          size="sm"
+                          value={announcementFilter}
+                          onChange={(e) => setAnnouncementFilter(e.target.value)}
+                        >
+                          <option value="All">All Types</option>
+                          <option value="General">General</option>
+                          <option value="Deadline">Deadline</option>
+                          <option value="Important">Important</option>
+                          <option value="Event">Event</option>
+                        </Form.Select>
+                      </div>
+                    )}
+                  </div>
                   {loadingAnnouncements ? (
                     <div className="text-center text-muted py-4">Loading announcements...</div>
                   ) : announcements.length === 0 ? (
                     <div className="text-center text-muted py-4">No announcements available</div>
+                  ) : filteredAnnouncements.length === 0 ? (
+                    <div className="text-center text-muted py-4">No matching announcements found</div>
                   ) : (
                     <div className="d-flex flex-column gap-3">
-                      {announcements.map(announcement => (
+                      {filteredAnnouncements.map(announcement => (
                         <div key={announcement._id} className="p-3 border rounded-3">
                           <div className="d-flex justify-content-between align-items-start">
                             <div className="flex-grow-1">

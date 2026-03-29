@@ -13,16 +13,16 @@ import activityRoutes from './routes/activityRoutes.js';
 import deadlineRoutes from './routes/deadlineRoutes.js';
 import publicRoutes from './routes/publicRoutes.js';
 
-// Load environment variables
+
 dotenv.config();
 
-// Connect to database
+
 connectDB();
 
-// Initialize Express app
+
 const app = express();
 
-// Middleware
+
 app.use(cors({
   origin: process.env.CLIENT_URL || 'http://localhost:5173',
   credentials: true
@@ -30,10 +30,10 @@ app.use(cors({
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve static files from uploads directory
+
 app.use('/uploads', express.static('uploads'));
 
-// Routes
+
 app.use('/api/auth', authRoutes);
 app.use('/api/staff', staffRoutes);
 app.use('/api/hod', hodRoutes);
@@ -45,7 +45,7 @@ app.use('/api/activities', activityRoutes);
 app.use('/api/deadlines', deadlineRoutes);
 app.use('/api/public', publicRoutes);
 
-// Health check route
+
 app.get('/api/health', (req, res) => {
   res.status(200).json({
     status: 'success',
@@ -54,7 +54,7 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Error handling middleware
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(err.statusCode || 500).json({
@@ -63,7 +63,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-// 404 handler
+
 app.use((req, res) => {
   res.status(404).json({
     status: 'error',
@@ -71,7 +71,7 @@ app.use((req, res) => {
   });
 });
 
-// Start server
+
 const PORT = process.env.PORT || 5001;
 app.listen(PORT, () => {
   console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);

@@ -9,7 +9,7 @@ const Home = () => {
   useEffect(() => {
     const fetchShowcase = async () => {
       try {
-        // Assuming your backend exposes an endpoint for public showcase
+        
         const response = await api.get('/public/showcase');
         if (response.data && response.data.data) {
           setTopProjects(response.data.data);
@@ -23,7 +23,7 @@ const Home = () => {
 
   return (
     <div className="min-vh-100 bg-light text-dark" style={{ background: '#f8f9fa' }}>
-      {/* Navigation Bar */}
+      
       <Navbar bg="white" variant="light" expand="lg" className="shadow-sm py-3 sticky-top">
         <Container>
           <Navbar.Brand className="fw-bold fs-3" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent'}}>
@@ -66,7 +66,7 @@ const Home = () => {
         </Container>
       </Navbar>
 
-      {/* Hero Section */}
+      
       <div className="py-5" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}>
         <Container className="py-5">
           <Row className="align-items-center">
@@ -106,7 +106,7 @@ const Home = () => {
         </Container>
       </div>
 
-      {/* Features Section */}
+      
       <Container className="py-5" id="features">
         <div className="text-center mb-5">
           <h2 className="display-5 fw-bold mb-3">Platform Features</h2>
@@ -210,7 +210,6 @@ const Home = () => {
         </Row>
       </Container>
 
-      {/* Showcase Section */}
       {topProjects.length > 0 && (
         <Container className="py-5" id="showcase">
           <div className="text-center mb-5">
@@ -251,8 +250,7 @@ const Home = () => {
           </Row>
         </Container>
       )}
-
-      {/* Role-based Access Section */}
+ 
       <div className="py-5" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} id="roles">
         <Container className="py-4">
           <div className="text-center text-white mb-5">
@@ -344,10 +342,6 @@ const Home = () => {
         </Container>
       </div>
 
-      {/* Demo Credentials Section */}
-    
-
-      {/* About Section */}
       <Container className="py-5" id="about">
         <Row className="align-items-center">
           <Col lg={6} className="mb-4 mb-lg-0">
@@ -430,7 +424,7 @@ const Home = () => {
         </Row>
       </Container>
 
-      {/* Footer */}
+      
       <div className="py-4 text-white" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}}>
         <Container>
           <div className="text-center">
@@ -441,5 +435,4 @@ const Home = () => {
     </div>
   );
 };
-
 export default Home;

@@ -26,7 +26,7 @@ const StaffDashboard = () => {
   const [loadingMessages, setLoadingMessages] = useState(false);
 
 
-  // Live data
+
   const [assignedStudents, setAssignedStudents] = useState([]);
   const [projects, setProjects] = useState([]);
   const [documents, setDocuments] = useState([]);
@@ -35,11 +35,10 @@ const StaffDashboard = () => {
   const [meetings, setMeetings] = useState([]);
   const [hods, setHods] = useState([]);
 
-  // Fetch staff-scoped data
   const fetchData = async () => {
     try {
       setLoadingData(true);
-      // announcements
+    
       setLoadingAnnouncements(true);
       const [annRes, studentsRes, projectsRes, docsRes, progressRes, messagesRes, meetingsRes, hodsRes] = await Promise.all([
         api.get('/communication/announcements'),
@@ -131,7 +130,7 @@ const StaffDashboard = () => {
   useEffect(() => { setStudentPage(1); }, [studentSearchQuery, studentFilter, pageSize]);
   useEffect(() => { setEvaluationPage(1); }, [pageSize]);
 
-  // Profile Management States
+  
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
   const [profileLoading, setProfileLoading] = useState(false);
   const [showModernSuccess, setShowModernSuccess] = useState(false);
@@ -198,7 +197,7 @@ const StaffDashboard = () => {
     }
   };
 
-  // Marks State
+ 
   const [showMarksModal, setShowMarksModal] = useState(false);
   const [marksData, setMarksData] = useState({
     titleMarks: 0,
@@ -210,7 +209,7 @@ const StaffDashboard = () => {
   });
   const [selectedProjectForMarks, setSelectedProjectForMarks] = useState(null);
 
-  // PDF Viewer State
+
   const [showPdfModal, setShowPdfModal] = useState(false);
   const [pdfUrl, setPdfUrl] = useState(null);
   const [numPages, setNumPages] = useState(null);
@@ -226,7 +225,7 @@ const StaffDashboard = () => {
       ? (doc.cloudinaryUrl || doc.fileUrl || doc.url) 
       : (api.defaults?.baseURL ? `${api.defaults.baseURL.replace(/\/$/, '')}/staff/documents/${doc._id || doc.id}/download` : `/api/staff/documents/${doc._id || doc.id}/download`);
     
-    // If it's a PDF file, open the in-app viewer. Otherwise fallback to standard new tab viewing/download.
+    
     if (doc.fileName?.toLowerCase().endsWith('.pdf') || doc.type?.toLowerCase() === 'pdf') {
       setPdfUrl(url);
       setShowPdfModal(true);
@@ -235,7 +234,7 @@ const StaffDashboard = () => {
     }
   };
 
-  // Reply Modal State
+ 
   const [showReplyModal, setShowReplyModal] = useState(false);
   const [replyToMessage, setReplyToMessage] = useState(null);
   const [replySubject, setReplySubject] = useState('');
@@ -279,23 +278,7 @@ const StaffDashboard = () => {
       await api.put(`/communication/messages/${messageId}/read`);
     } catch (error) {
       console.error('Error marking message as read:', error);
-      fetchMessages(); // Revert on failure
-    }
-  };
-
-  const STAGES = ['Proposal Submitted', 'Proposal Approved', 'Development', 'Mid Review', 'Testing', 'Final Submission'];
-
-  const handleUpdateStage = async (projectId, newStage) => {
-    try {
-      const res = await api.put(`/staff/projects/${projectId}/status`, { stage: newStage });
-      if (res.data.status === 'success') {
-        setProjects(projects.map(p => (p._id || p.id) === projectId ? { ...p, stage: newStage } : p));
-        setSuccessMessage('Project stage updated successfully');
-        setTimeout(() => setSuccessMessage(''), 3000);
-      }
-    } catch (err) {
-      setErrorMessage('Error updating stage: ' + (err.response?.data?.message || err.message));
-      setTimeout(() => setErrorMessage(''), 3000);
+      fetchMessages();
     }
   };
 
@@ -369,7 +352,7 @@ const StaffDashboard = () => {
       });
       setSuccessMessage('Marks assigned successfully');
       setShowMarksModal(false);
-      fetchData(); // Refresh data
+      fetchData(); 
     } catch (error) {
       setErrorMessage('Error assigning marks: ' + (error.response?.data?.message || error.message));
       setTimeout(() => setErrorMessage(''), 5000);
@@ -469,7 +452,7 @@ const StaffDashboard = () => {
       });
 
       if (response.data.status === 'success') {
-        // Update local state with the response data
+       
         setDocuments(documents.map(d =>
           (d._id || d.id) === documentId
             ? response.data.data
@@ -521,7 +504,7 @@ const StaffDashboard = () => {
         setSuccessMessage('Student created successfully!');
         e.target.reset();
         setActiveTab('students');
-        await fetchData(); // Refetch data to update assigned students
+        await fetchData(); 
         setTimeout(() => setSuccessMessage(''), 3000);
       }
     } catch (error) {
@@ -550,7 +533,7 @@ const StaffDashboard = () => {
       setMessageReceiver('');
       setMessageSubject('');
       setMessageContent('');
-      // Refresh messages
+    
       await fetchMessages();
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
@@ -641,9 +624,33 @@ const StaffDashboard = () => {
   const currentEvals = evaluatedProjects.slice(indexOfFirstEval, indexOfLastEval);
   const totalEvalPages = Math.ceil(evaluatedProjects.length / pageSize);
 
+  const getDaysRemaining = (dateString) => {
+    const deadlineDate = new Date(dateString);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    deadlineDate.setHours(0, 0, 0, 0);
+    const diffTime = deadlineDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
+    if (diffDays === 0) return "Due today";
+    if (diffDays === 1) return "Due tomorrow";
+    if (diffDays > 1) return `Due in ${diffDays} days`;
+    return "Expired";
+  };
+
+  const activeDeadlines = deadlines.filter(deadline => getDaysRemaining(deadline.date) !== "Expired");
+
+  const staffApprovedProjects = projects.filter(p => (p.approvalStatus || p.approval) === 'Approved');
+  const approvedProjectIds = staffApprovedProjects.map(p => (p._id || p.id).toString());
+
+  const documentsForApprovedProjects = documents.filter(doc => {
+    const docProjectId = doc.projectId?._id || doc.projectId;
+    // Ensure docProjectId is not null/undefined before calling toString()
+    return docProjectId && approvedProjectIds.includes(docProjectId.toString());
+  });
+
   return (
       <div className="min-vh-100 bg-light text-dark" style={{ background: '#f8f9fa' }}>
-      {/* Navbar */}
+      
       <div className="shadow-sm py-3 sticky-top bg-white">
         <Container fluid className="px-4">
           <div className="d-flex justify-content-between align-items-center">
@@ -675,7 +682,7 @@ const StaffDashboard = () => {
           </Alert>
         )}
 
-        {/* Tabs */}
+      
         <div className="d-flex gap-2 mb-4 flex-wrap">
           <Button
             variant={activeTab === 'overview' ? 'primary' : 'light'}
@@ -767,7 +774,7 @@ const StaffDashboard = () => {
           </Button>
         </div>
 
-        {/* My Profile Tab */}
+       
         {activeTab === 'profile' && (
           <Row className="g-4 profile-card-animate">
             <Col lg={4}>
@@ -810,81 +817,82 @@ const StaffDashboard = () => {
               <Card className="border-0 shadow-sm rounded-4 h-100">
                 <Card.Body className="p-4 p-md-5">
                   <h5 className="fw-bold mb-4 pb-2 border-bottom">Personal Information</h5>
-                  <Row className="g-4 mb-5">
+                  <Row className="g-4">
                     <Col md={6}>
-                      <div className="d-flex align-items-start gap-3">
-                        <div className="p-2 bg-light rounded-3 text-primary" style={{color: '#4facfe'}}>
+                      <div className="d-flex align-items-center gap-3 p-3 rounded-4 bg-light border border-light-subtle shadow-sm">
+                        <div className="p-3 bg-primary bg-opacity-10 rounded-circle text-primary">
                           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
                         </div>
                         <div>
                           <small className="text-muted d-block fw-semibold mb-1">Email Address</small>
-                          <span className="fs-6 text-dark">{user?.email || 'N/A'}</span>
+                          <span className="fs-6 text-dark fw-bold">{user?.email || 'N/A'}</span>
                         </div>
                       </div>
                     </Col>
                     <Col md={6}>
-                      <div className="d-flex align-items-start gap-3">
-                        <div className="p-2 bg-light rounded-3 text-primary" style={{color: '#4facfe'}}>
+                      <div className="d-flex align-items-center gap-3 p-3 rounded-4 bg-light border border-light-subtle shadow-sm">
+                        <div className="p-3 bg-success bg-opacity-10 rounded-circle text-success">
                           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
                         </div>
                         <div>
                           <small className="text-muted d-block fw-semibold mb-1">Phone Number</small>
-                          <span className="fs-6 text-dark">{user?.phone || 'Not provided'}</span>
+                          <span className="fs-6 text-dark fw-bold">{user?.phone || 'Not provided'}</span>
                         </div>
                       </div>
                     </Col>
                     <Col md={6}>
-                      <div className="d-flex align-items-start gap-3">
-                        <div className="p-2 bg-light rounded-3 text-primary" style={{color: '#4facfe'}}>
+                      <div className="d-flex align-items-center gap-3 p-3 rounded-4 bg-light border border-light-subtle shadow-sm">
+                        <div className="p-3 bg-info bg-opacity-10 rounded-circle text-info">
                           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
                         </div>
                         <div>
                           <small className="text-muted d-block fw-semibold mb-1">Department</small>
-                          <span className="fs-6 text-dark">{user?.department || 'N/A'}</span>
+                          <span className="fs-6 text-dark fw-bold">{user?.department || 'N/A'}</span>
                         </div>
                       </div>
                     </Col>
                     <Col md={6}>
-                      <div className="d-flex align-items-start gap-3">
-                        <div className="p-2 bg-light rounded-3 text-primary" style={{color: '#4facfe'}}>
+                      <div className="d-flex align-items-center gap-3 p-3 rounded-4 bg-light border border-light-subtle shadow-sm">
+                        <div className="p-3 bg-warning bg-opacity-10 rounded-circle text-warning">
                           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                         </div>
                         <div>
                           <small className="text-muted d-block fw-semibold mb-1">Joined</small>
-                          <span className="fs-6 text-dark">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Recently'}</span>
+                          <span className="fs-6 text-dark fw-bold">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Recently'}</span>
                         </div>
                       </div>
                     </Col>
                   </Row>
 
-                  <h5 className="fw-bold mb-4 pb-2 border-bottom">Overview Statistics</h5>
-                  <Row className="g-3">
+                  <h5 className="fw-bold mb-4 pb-2 border-bottom mt-5">Overview Statistics</h5>
+                  <Row className="g-4">
                     <Col sm={4}>
-                      <div className="p-3 bg-light rounded-3 text-center border">
-                        <h3 className="fw-bold text-primary mb-1">{assignedStudents.length}</h3>
-                        <small className="text-muted fw-semibold">Students</small>
+                      <div className="p-4 bg-light rounded-4 text-center border border-light-subtle shadow-sm h-100 d-flex flex-column justify-content-center">
+                        <h2 className="fw-bold text-primary mb-2 display-6">{assignedStudents.length}</h2>
+                        <span className="text-muted fw-semibold text-uppercase" style={{fontSize: '0.8rem', letterSpacing: '1px'}}>Assigned Students</span>
                       </div>
                     </Col>
                     <Col sm={4}>
-                      <div className="p-3 bg-light rounded-3 text-center border">
-                        <h3 className="fw-bold text-success mb-1">{projects.length}</h3>
-                        <small className="text-muted fw-semibold">Projects</small>
+                      <div className="p-4 bg-light rounded-4 text-center border border-light-subtle shadow-sm h-100 d-flex flex-column justify-content-center">
+                        <h2 className="fw-bold text-success mb-2 display-6">{staffApprovedProjects.length}</h2>
+                        <span className="text-muted fw-semibold text-uppercase" style={{fontSize: '0.8rem', letterSpacing: '1px'}}>Approved Projects</span>
                       </div>
                     </Col>
                     <Col sm={4}>
-                      <div className="p-3 bg-light rounded-3 text-center border">
-                        <h3 className="fw-bold text-warning mb-1">{documents.length}</h3>
-                        <small className="text-muted fw-semibold">Docs Reviewed</small>
+                      <div className="p-4 bg-light rounded-4 text-center border border-light-subtle shadow-sm h-100 d-flex flex-column justify-content-center">
+                        <h2 className="fw-bold text-warning mb-2 display-6">{documentsForApprovedProjects.length}</h2>
+                        <span className="text-muted fw-semibold text-uppercase" style={{fontSize: '0.8rem', letterSpacing: '1px'}}>Documents Reviewed</span>
                       </div>
                     </Col>
                   </Row>
+              
                 </Card.Body>
               </Card>
             </Col>
           </Row>
         )}
 
-        {/* Overview Tab */}
+       
         {activeTab === 'overview' && (
           <Row className="g-4">
             <Col lg={3} md={6}>
@@ -927,20 +935,23 @@ const StaffDashboard = () => {
               </Card>
             </Col>
 
-            {deadlines.length > 0 && (
+            {activeDeadlines.length > 0 && (
               <Col lg={12}>
                 <Card className="border-0 shadow-sm">
                   <Card.Body className="p-4">
                     <h5 className="fw-bold mb-4">⏰ Global Deadlines</h5>
                     <div className="d-flex flex-column gap-3">
-                      {deadlines.map(deadline => (
+                      {activeDeadlines.map(deadline => (
                         <div key={deadline._id} className="p-3 bg-light rounded-3 d-flex justify-content-between align-items-center border-start border-4 border-warning">
                           <div>
                             <h6 className="fw-bold mb-1">{deadline.title === 'Other' ? deadline.customTitle : deadline.title}</h6>
                             <p className="text-muted mb-0 small">{deadline.description}</p>
                           </div>
                           <div className="text-end">
-                            <div className="fw-bold text-danger">{new Date(deadline.date).toLocaleDateString()}</div>
+                            <div className="fw-bold text-danger">
+                              {new Date(deadline.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                            </div>
+                            <span className="badge bg-danger mt-1">{getDaysRemaining(deadline.date)}</span>
                           </div>
                         </div>
                       ))}
@@ -950,7 +961,7 @@ const StaffDashboard = () => {
               </Col>
             )}
 
-            {/* Quick Action: Message HOD */}
+            
             <Col lg={12}>
               <Card className="border-0 shadow-sm border-start border-5 border-primary bg-white">
                 <Card.Body className="p-4 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
@@ -1011,7 +1022,7 @@ const StaffDashboard = () => {
           </Row>
         )}
 
-        {/* Assigned Students Tab */}
+      
         {activeTab === 'students' && (
           <Row className="g-4">
             <Col lg={12}>
@@ -1073,7 +1084,7 @@ const StaffDashboard = () => {
                             <td><Badge bg="primary">{student.projectCount || student.projects || 0}</Badge></td>
                             <td>
                               <Button variant="sm" size="sm" className="me-2" onClick={() => handleViewProfile(student)}>View Profile</Button>
-                              {/* <Button variant="outline-secondary" size="sm">Send Message</Button> */}
+                             
                             </td>
                           </tr>
                         ))
@@ -1095,7 +1106,7 @@ const StaffDashboard = () => {
           </Row>
         )}
 
-        {/* Approvals Tab */}
+       
         {activeTab === 'approvals' && (
           <Row className="g-4">
             <Col lg={12}>
@@ -1207,7 +1218,7 @@ const StaffDashboard = () => {
                                   </Button>
                                 </>
                               )}
-                              {/* Approval Modal */}
+                            
                               <Modal show={showApprovalModal} onHide={() => setShowApprovalModal(false)} centered>
                                 ...
                               </Modal>
@@ -1255,7 +1266,7 @@ const StaffDashboard = () => {
           </Row>
         )}
 
-        {/* Evaluations Tab */}
+      
         {activeTab === 'evaluations' && (
           <Row className="g-4">
             <Col lg={12}>
@@ -1321,7 +1332,7 @@ const StaffDashboard = () => {
           </Row>
         )}
 
-        {/* Document Reviews Tab */}
+      
         {activeTab === 'documents' && (
           <Row className="g-4">
             <Col lg={12}>
@@ -1474,7 +1485,7 @@ const StaffDashboard = () => {
           </Modal.Footer>
         </Modal>
 
-        {/* Document Review Modal */}
+       
         <Modal show={showReviewModal} onHide={() => setShowReviewModal(false)} centered>
           <Modal.Header closeButton>
             <Modal.Title>Document Review - {reviewStatus}</Modal.Title>
@@ -1508,70 +1519,11 @@ const StaffDashboard = () => {
           </Modal.Footer>
         </Modal>
 
-        {/* Progress Tab */}
+        
         {activeTab === 'progress' && (
           <Row className="g-4">
             <Col lg={12}>
               <Card className="border-0 shadow-sm mb-4">
-                <Card.Body className="p-4">
-                  <h5 className="fw-bold mb-4">📈 Project Stage Tracker</h5>
-                  {projects.filter(p => (p.approvalStatus || p.approval) === 'Approved').length === 0 ? (
-                    <div className="text-center text-muted py-4">No approved projects yet</div>
-                  ) : (
-                    <div className="d-flex flex-column gap-4">
-                      {projects.filter(p => (p.approvalStatus || p.approval) === 'Approved').map(project => {
-                        const currentStageIndex = STAGES.indexOf(project.stage || 'Proposal Approved');
-                        return (
-                          <div key={project._id || project.id} className="p-3 border rounded-3 bg-white shadow-sm">
-                            <div className="d-flex justify-content-between align-items-center mb-4">
-                              <div>
-                                <h6 className="fw-bold mb-0">{project.title}</h6>
-                                <small className="text-muted">Student: {project.studentId?.name || 'N/A'}</small>
-                              </div>
-                              <Form.Select 
-                                size="sm" 
-                                className="w-auto fw-semibold border-primary text-primary bg-light"
-                                value={project.stage || 'Proposal Approved'}
-                                onChange={(e) => handleUpdateStage(project._id || project.id, e.target.value)}
-                              >
-                                {STAGES.map(stage => (
-                                  <option key={stage} value={stage}>{stage}</option>
-                                ))}
-                              </Form.Select>
-                            </div>
-                            
-                            <div className="position-relative mt-4 mb-2 mx-4">
-                              <div className="progress position-absolute w-100" style={{ height: '4px', top: '13px', zIndex: 0 }}>
-                                <div 
-                                  className="progress-bar bg-success transition-all" 
-                                  style={{ width: `${(Math.max(0, currentStageIndex) / (STAGES.length - 1)) * 100}%`, transition: 'width 0.5s ease-in-out' }}
-                                ></div>
-                              </div>
-                              <div className="d-flex justify-content-between position-relative" style={{ zIndex: 1 }}>
-                                {STAGES.map((stage, idx) => (
-                                  <div key={stage} className="d-flex flex-column align-items-center" style={{ width: '80px', marginLeft: idx === 0 ? '-40px' : '0', marginRight: idx === STAGES.length - 1 ? '-40px' : '0' }}>
-                                    <div 
-                                      className={`rounded-circle d-flex align-items-center justify-content-center fw-bold shadow-sm ${idx <= currentStageIndex ? 'bg-success text-white' : 'bg-white text-muted border'}`}
-                                      style={{ width: '30px', height: '30px', fontSize: '12px', transition: 'all 0.3s ease' }}
-                                    >
-                                      {idx <= currentStageIndex ? '✓' : idx + 1}
-                                    </div>
-                                    <div className="text-center mt-2 text-wrap" style={{ fontSize: '0.75rem', lineHeight: '1.2', fontWeight: idx <= currentStageIndex ? '600' : 'normal', color: idx <= currentStageIndex ? '#198754' : '#6c757d' }}>
-                                      {stage}
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  )}
-                </Card.Body>
-              </Card>
-
-              <Card className="border-0 shadow-sm">
                 <Card.Body className="p-4">
                   <h5 className="fw-bold mb-4">📅📅 Weekly Progress Updates</h5>
                   {progressUpdates.length === 0 ? (
@@ -1623,7 +1575,7 @@ const StaffDashboard = () => {
           </Row>
         )}
 
-        {/* Meetings Tab */}
+       
         {activeTab === 'meetings' && (
           <Row className="g-4">
             <Col lg={12}>
@@ -1675,7 +1627,7 @@ const StaffDashboard = () => {
           </Row>
         )}
 
-        {/* Create Student Tab */}
+       
         {activeTab === 'create-student' && (
           <Row className="g-4">
             <Col lg={8} className="mx-auto">
@@ -1758,7 +1710,7 @@ const StaffDashboard = () => {
           </Row>
         )}
 
-        {/* Messages Tab */}
+  
         {activeTab === 'messages' && (
           <Row className="g-4">
             <Col lg={12}>
@@ -1840,7 +1792,7 @@ const StaffDashboard = () => {
           </Row>
         )}
 
-        {/* Announcements Tab */}
+     
         {activeTab === 'announcements' && (
           <Row className="g-4">
             <Col lg={12}>
@@ -1880,7 +1832,7 @@ const StaffDashboard = () => {
         )}
       </Container>
 
-      {/* Compose Message Modal */}
+     
       <Modal show={showComposeModal} onHide={() => setShowComposeModal(false)} size="lg" centered className="border-0">
         <Modal.Header closeButton className="border-0 pb-0">
           <Modal.Title className="fw-bold">✉️ Compose Message</Modal.Title>
@@ -1955,7 +1907,7 @@ const StaffDashboard = () => {
         </Modal.Body>
       </Modal>
 
-      {/* Reply Modal */}
+      
       <Modal show={showReplyModal} onHide={() => setShowReplyModal(false)} centered className="border-0">
         <Modal.Header closeButton className="border-0 pb-0">
           <Modal.Title className="fw-bold">↩️ Reply to Message</Modal.Title>
@@ -2007,7 +1959,7 @@ const StaffDashboard = () => {
         </Modal.Body>
       </Modal>
 
-      {/* Student Profile Modal */}
+      
       <Modal show={showStudentProfileModal} onHide={() => setShowStudentProfileModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Student Profile</Modal.Title>
@@ -2018,7 +1970,7 @@ const StaffDashboard = () => {
               <p><strong>Name:</strong> {selectedStudent.name}</p>
               <p><strong>Student ID:</strong> {selectedStudent.studentId}</p>
               <p><strong>Email:</strong> {selectedStudent.email}</p>
-              {/* Add more student details here as needed */}
+            
             </div>
           )}
         </Modal.Body>
@@ -2029,7 +1981,7 @@ const StaffDashboard = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* Marks Modal */}
+     
       <Modal show={showMarksModal} onHide={() => setShowMarksModal(false)} centered>
         <Modal.Header closeButton>
           <Modal.Title>Evaluate Project: {selectedProjectForMarks?.title}</Modal.Title>
@@ -2090,7 +2042,7 @@ const StaffDashboard = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* PDF Viewer Modal */}
+     
       <Modal show={showPdfModal} onHide={() => setShowPdfModal(false)} size="xl" centered>
         <Modal.Header closeButton>
           <Modal.Title>Document Viewer</Modal.Title>
@@ -2132,7 +2084,7 @@ const StaffDashboard = () => {
         </Modal.Footer>
       </Modal>
 
-      {/* Profile Edit Modal */}
+
       <Modal show={showEditProfileModal} onHide={() => !profileLoading && setShowEditProfileModal(false)} centered backdrop="static">
         <Modal.Header closeButton={!profileLoading} className="border-0 pb-0">
           <Modal.Title className="fw-bold">Edit Profile</Modal.Title>
@@ -2177,7 +2129,6 @@ const StaffDashboard = () => {
         </Modal.Body>
       </Modal>
 
-      {/* Change Password Modal */}
       <Modal show={showChangePasswordModal} onHide={() => !passwordLoading && setShowChangePasswordModal(false)} centered backdrop="static">
         <Modal.Header closeButton={!passwordLoading} className="border-0 pb-0">
           <Modal.Title className="fw-bold">Change Password</Modal.Title>
@@ -2224,7 +2175,7 @@ const StaffDashboard = () => {
         </Modal.Body>
       </Modal>
 
-      {/* Modern Success Popup */}
+     
       <Modal show={showModernSuccess} onHide={() => setShowModernSuccess(false)} centered size="sm" className="border-0">
         <Modal.Body className="text-center p-4">
           <div className="mb-3">
