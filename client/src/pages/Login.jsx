@@ -2,7 +2,7 @@ import { useState } from 'react';
 import ForgotPasswordModal from '../components/ForgotPasswordModal';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Container, Row, Col, Card, Form, Button, Alert, Modal } from 'react-bootstrap';
+import { Container, Row, Col, Card, Form, Button, Alert, Modal, Spinner } from 'react-bootstrap';
 
 const Login = () => {
   const [formData, setFormData] = useState({
@@ -84,7 +84,17 @@ const Login = () => {
       <Container>
         <Row className="justify-content-center">
           <Col md={6} lg={5}>
-            <Card className="shadow-lg border-0 rounded-4">
+            <Card className="shadow-lg border-0 rounded-4 login-card-fade-in position-relative overflow-hidden">
+              {/* Modern Loading Overlay */}
+              {isSubmitting && (
+                <div className="position-absolute w-100 h-100 d-flex flex-column align-items-center justify-content-center" style={{ top: 0, left: 0, zIndex: 50, background: 'rgba(255, 255, 255, 0.85)', backdropFilter: 'blur(5px)' }}>
+                  <div className="spinner-border mb-3" style={{ width: '3.5rem', height: '3.5rem', color: '#667eea', borderWidth: '0.25rem' }} role="status">
+                    <span className="visually-hidden">Loading...</span>
+                  </div>
+                  <h5 className="fw-bold mb-1" style={{ color: '#764ba2' }}>Authenticating...</h5>
+                  <p className="text-muted small mb-0">Securely logging you in</p>
+                </div>
+              )}
               <Card.Body className="p-5">
                 <div className="text-center mb-4">
                   <h1 className="fw-bold mb-2">Welcome Back</h1>
@@ -137,7 +147,12 @@ const Login = () => {
                     disabled={isSubmitting}
                     style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)', border: 'none'}}
                   >
-                    {isSubmitting ? 'Signing in...' : 'Sign In'}
+                    {isSubmitting ? (
+                      <>
+                        <Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" />
+                        Signing in...
+                      </>
+                    ) : 'Sign In'}
                   </Button>
                 </Form>
 

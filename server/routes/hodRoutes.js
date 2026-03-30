@@ -46,4 +46,8 @@ router.get('/announcements', protect, isHOD, hodController.getAllAnnouncements);
 router.put('/announcements/:announcementId', protect, isHOD, hodController.updateAnnouncement);
 router.delete('/announcements/:announcementId', protect, isHOD, hodController.deleteAnnouncement);
 
+// Profile Management
+router.put('/profile', protect, isHOD, hodController.updateProfile);
+router.put('/change-password', protect, isHOD, hodController.changePassword);
+
 export default router;

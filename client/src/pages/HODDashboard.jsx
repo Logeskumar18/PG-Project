@@ -83,6 +83,73 @@ const HODDashboard = () => {
   const [replyContent, setReplyContent] = useState('');
   const [replyLoading, setReplyLoading] = useState(false);
 
+  // Profile Management States
+  const [showEditProfileModal, setShowEditProfileModal] = useState(false);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [showModernSuccess, setShowModernSuccess] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: user?.name || '',
+    department: user?.department || '',
+    phone: user?.phone || ''
+  });
+
+  const handleProfileUpdate = async (e) => {
+    e.preventDefault();
+    setProfileLoading(true);
+    try {
+      await api.put('/hod/profile', {
+        name: profileForm.name,
+        department: profileForm.department,
+        phone: profileForm.phone
+      });
+      setShowEditProfileModal(false);
+      setShowModernSuccess(true);
+    } catch (error) {
+      setErrorMessage('Failed to update profile');
+    } finally {
+      setProfileLoading(false);
+    }
+  };
+
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
+
+  const handlePasswordChange = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordError('New passwords do not match');
+      return;
+    }
+    
+    const passwordRegex = /^(?=.*[0-9])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]{6,}$/;
+    if (!passwordRegex.test(passwordForm.newPassword)) {
+      setPasswordError('Password must be at least 6 characters, include a number and a special character.');
+      return;
+    }
+    
+    setPasswordLoading(true);
+    try {
+      await api.put('/hod/change-password', {
+        currentPassword: passwordForm.currentPassword,
+        newPassword: passwordForm.newPassword
+      });
+      setShowChangePasswordModal(false);
+      setShowModernSuccess(true);
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error) {
+      setPasswordError(error.response?.data?.message || 'Failed to change password');
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
+
   // Search filter state and logic for All Projects
   const [searchProject, setSearchProject] = useState('');
   const [projectFilterStatus, setProjectFilterStatus] = useState('All');
@@ -796,6 +863,13 @@ const HODDashboard = () => {
             className="fw-semibold"
           >
             💬 Messages
+          </Button>
+          <Button
+            variant={activeTab === 'profile' ? 'primary' : 'light'}
+            onClick={() => setActiveTab('profile')}
+            className="fw-semibold"
+          >
+            👤 My Profile
           </Button>
         </div>
 
@@ -1539,6 +1613,124 @@ const HODDashboard = () => {
             </Col>
           </Row>
         )}
+
+        {/* Profile Tab */}
+        {activeTab === 'profile' && (
+          <Row className="g-4 profile-card-animate">
+            <Col lg={4}>
+              <Card className="border-0 shadow-sm rounded-4 overflow-hidden h-100">
+                <div style={{ height: '120px', background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)' }}></div>
+                <Card.Body className="p-4 text-center position-relative pb-5">
+                  <div 
+                    className="rounded-circle bg-white d-flex align-items-center justify-content-center shadow-sm" 
+                    style={{ width: '100px', height: '100px', margin: '-70px auto 15px', border: '4px solid white', fontSize: '3rem' }}
+                  >
+                    👨‍💼
+                  </div>
+                  <h4 className="fw-bold mb-1" style={{ color: '#2d3748' }}>{user?.name || 'HOD Name'}</h4>
+                  <p className="text-muted mb-3">{user?.role || 'Head of Department'}</p>
+                  
+                  <div className="d-flex justify-content-center gap-2 mb-4">
+                    <Badge bg="info" className="px-3 py-2 rounded-pill fw-normal text-dark">{user?.department || 'Department'}</Badge>
+                  </div>
+
+                  <Button 
+                    variant="primary" 
+                    className="w-100 py-2 fw-semibold rounded-pill shadow-sm mb-3"
+                    onClick={() => { setProfileForm({ name: user?.name || '', department: user?.department || '', phone: user?.phone || '' }); setShowEditProfileModal(true); }}
+                    style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', border: 'none' }}
+                  >
+                    ✏️ Edit Profile
+                  </Button>
+                  <Button 
+                    variant="outline-secondary" 
+                    className="w-100 py-2 fw-semibold rounded-pill shadow-sm"
+                    onClick={() => setShowChangePasswordModal(true)}
+                  >
+                    🔒 Change Password
+                  </Button>
+                </Card.Body>
+              </Card>
+            </Col>
+            
+            <Col lg={8}>
+              <Card className="border-0 shadow-sm rounded-4 h-100">
+                <Card.Body className="p-4 p-md-5">
+                  <h5 className="fw-bold mb-4 pb-2 border-bottom">Personal Information</h5>
+                  <Row className="g-4">
+                    <Col md={6}>
+                      <div className="d-flex align-items-center gap-3 p-3 rounded-4 bg-light border border-light-subtle shadow-sm">
+                        <div className="p-3 bg-primary bg-opacity-10 rounded-circle text-primary">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                        </div>
+                        <div>
+                          <small className="text-muted d-block fw-semibold mb-1">Email Address</small>
+                          <span className="fs-6 text-dark fw-bold">{user?.email || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </Col>
+                    <Col md={6}>
+                      <div className="d-flex align-items-center gap-3 p-3 rounded-4 bg-light border border-light-subtle shadow-sm">
+                        <div className="p-3 bg-success bg-opacity-10 rounded-circle text-success">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path></svg>
+                        </div>
+                        <div>
+                          <small className="text-muted d-block fw-semibold mb-1">Phone Number</small>
+                          <span className="fs-6 text-dark fw-bold">{user?.phone || 'Not provided'}</span>
+                        </div>
+                      </div>
+                    </Col>
+                    <Col md={6}>
+                      <div className="d-flex align-items-center gap-3 p-3 rounded-4 bg-light border border-light-subtle shadow-sm">
+                        <div className="p-3 bg-info bg-opacity-10 rounded-circle text-info">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
+                        </div>
+                        <div>
+                          <small className="text-muted d-block fw-semibold mb-1">Department</small>
+                          <span className="fs-6 text-dark fw-bold">{user?.department || 'N/A'}</span>
+                        </div>
+                      </div>
+                    </Col>
+                    <Col md={6}>
+                      <div className="d-flex align-items-center gap-3 p-3 rounded-4 bg-light border border-light-subtle shadow-sm">
+                        <div className="p-3 bg-warning bg-opacity-10 rounded-circle text-warning">
+                          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        </div>
+                        <div>
+                          <small className="text-muted d-block fw-semibold mb-1">Joined</small>
+                          <span className="fs-6 text-dark fw-bold">{user?.createdAt ? new Date(user.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Recently'}</span>
+                        </div>
+                      </div>
+                    </Col>
+                  </Row>
+
+                  <h5 className="fw-bold mb-4 pb-2 border-bottom mt-5">Department Statistics</h5>
+                  <Row className="g-4">
+                    <Col sm={4}>
+                      <div className="p-4 bg-light rounded-4 text-center border border-light-subtle shadow-sm h-100 d-flex flex-column justify-content-center">
+                        <h2 className="fw-bold text-primary mb-2 display-6">{stats.totalStudents}</h2>
+                        <span className="text-muted fw-semibold text-uppercase" style={{fontSize: '0.8rem', letterSpacing: '1px'}}>Students</span>
+                      </div>
+                    </Col>
+                    <Col sm={4}>
+                      <div className="p-4 bg-light rounded-4 text-center border border-light-subtle shadow-sm h-100 d-flex flex-column justify-content-center">
+                        <h2 className="fw-bold text-success mb-2 display-6">{stats.totalStaff}</h2>
+                        <span className="text-muted fw-semibold text-uppercase" style={{fontSize: '0.8rem', letterSpacing: '1px'}}>Staff Members</span>
+                      </div>
+                    </Col>
+                    <Col sm={4}>
+                      <div className="p-4 bg-light rounded-4 text-center border border-light-subtle shadow-sm h-100 d-flex flex-column justify-content-center">
+                        <h2 className="fw-bold text-warning mb-2 display-6">{approvedProjectsCount}</h2>
+                        <span className="text-muted fw-semibold text-uppercase" style={{fontSize: '0.8rem', letterSpacing: '1px'}}>Approved Projects</span>
+                      </div>
+                    </Col>
+                  </Row>
+              
+                </Card.Body>
+              </Card>
+            </Col>
+          </Row>
+        )}
       </Container>
 
       {/* Modals */}
@@ -2028,6 +2220,115 @@ const HODDashboard = () => {
           </Form>
         </Modal.Body>
       </Modal>
+
+      {/* Profile Edit Modal */}
+      <Modal show={showEditProfileModal} onHide={() => !profileLoading && setShowEditProfileModal(false)} centered backdrop="static">
+        <Modal.Header closeButton={!profileLoading} className="border-0 pb-0">
+          <Modal.Title className="fw-bold">Edit Profile</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form onSubmit={handleProfileUpdate}>
+            <Form.Group className="mb-3">
+              <Form.Label>Full Name</Form.Label>
+              <Form.Control 
+                type="text" 
+                value={profileForm.name} 
+                onChange={(e) => setProfileForm({...profileForm, name: e.target.value})}
+                required 
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Department</Form.Label>
+              <Form.Control 
+                type="text" 
+                value={profileForm.department} 
+                onChange={(e) => setProfileForm({...profileForm, department: e.target.value})} 
+              />
+            </Form.Group>
+            <Form.Group className="mb-4">
+              <Form.Label>Phone Number</Form.Label>
+              <Form.Control 
+                type="text" 
+                value={profileForm.phone} 
+                onChange={(e) => setProfileForm({...profileForm, phone: e.target.value.replace(/\D/g, '').slice(0, 10)})} 
+                maxLength={10}
+                minLength={10}
+                pattern="\d{10}"
+              />
+            </Form.Group>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="light" onClick={() => setShowEditProfileModal(false)} disabled={profileLoading}>Cancel</Button>
+              <Button type="submit" disabled={profileLoading} style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', border: 'none' }}>
+                {profileLoading ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Saving...</> : 'Save Changes'}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* Change Password Modal */}
+      <Modal show={showChangePasswordModal} onHide={() => !passwordLoading && setShowChangePasswordModal(false)} centered backdrop="static">
+        <Modal.Header closeButton={!passwordLoading} className="border-0 pb-0">
+          <Modal.Title className="fw-bold">Change Password</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {passwordError && <Alert variant="danger" className="mb-3">{passwordError}</Alert>}
+          <Form onSubmit={handlePasswordChange}>
+            <Form.Group className="mb-3">
+              <Form.Label>Current Password</Form.Label>
+              <Form.Control 
+                type="password" 
+                value={passwordForm.currentPassword} 
+                onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                required 
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>New Password</Form.Label>
+              <Form.Control 
+                type="password" 
+                value={passwordForm.newPassword} 
+                onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                required 
+                minLength={6}
+              />
+            </Form.Group>
+            <Form.Group className="mb-4">
+              <Form.Label>Confirm New Password</Form.Label>
+              <Form.Control 
+                type="password" 
+                value={passwordForm.confirmPassword} 
+                onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                required 
+                minLength={6}
+              />
+            </Form.Group>
+            <div className="d-flex justify-content-end gap-2">
+              <Button variant="light" onClick={() => setShowChangePasswordModal(false)} disabled={passwordLoading}>Cancel</Button>
+              <Button type="submit" disabled={passwordLoading} style={{ background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)', border: 'none' }}>
+                {passwordLoading ? <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Updating...</> : 'Update Password'}
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+
+      {/* Modern Success Popup */}
+      <Modal show={showModernSuccess} onHide={() => setShowModernSuccess(false)} centered size="sm" className="border-0">
+        <Modal.Body className="text-center p-4">
+          <div className="mb-3">
+            <div className="rounded-circle bg-success d-inline-flex align-items-center justify-content-center shadow-sm" style={{width: '70px', height: '70px'}}>
+              <svg width="35" height="35" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+          </div>
+          <h4 className="fw-bold mb-2">Success!</h4>
+          <p className="text-muted mb-4">Your profile has been updated successfully.</p>
+          <Button variant="success" className="w-100 rounded-pill fw-semibold py-2" onClick={() => setShowModernSuccess(false)}>Awesome</Button>
+        </Modal.Body>
+      </Modal>
+
     </div>
   );
 };

@@ -32,7 +32,9 @@ import Milestone from '../models/Milestone.js';
 import Student from '../models/Student.js';
 import Staff from '../models/Staff.js';
 import Announcement from '../models/Announcement.js';
-import { notifyAnnouncement } from '../utils/notificationService.js';
+import HOD from '../models/HOD.js';
+import bcrypt from 'bcryptjs';
+import { notifyAnnouncement, notifyPasswordChange } from '../utils/notificationService.js';
 
 
 // Get dashboard overview for HOD
@@ -83,6 +85,67 @@ export const getDashboardOverview = async (req, res) => {
       status: 'error',
       message: error.message
     });
+  }
+};
+
+// ================= PROFILE MANAGEMENT =================
+export const updateProfile = async (req, res) => {
+  try {
+    const { name, department, phone } = req.body;
+    
+    const hod = await HOD.findByIdAndUpdate(
+      req.user._id,
+      { name, department, phone },
+      { new: true, runValidators: true }
+    ).select('-password');
+    
+    if (!hod) {
+      return res.status(404).json({ message: 'HOD profile not found' });
+    }
+    
+    res.json({ success: true, message: 'Profile updated successfully', data: hod });
+  } catch (error) {
+    res.status(500).json({ message: 'Error updating profile', error: error.message });
+  }
+};
+
+// ================= PASSWORD MANAGEMENT =================
+export const changePassword = async (req, res) => {
+  try {
+    const { currentPassword, newPassword } = req.body;
+    
+    // Enforce stricter password requirements
+    const passwordRegex = /^(?=.*[0-9])(?=.*[!@#$%^&*])[a-zA-Z0-9!@#$%^&*]{6,}$/;
+    if (!passwordRegex.test(newPassword)) {
+      return res.status(400).json({ 
+        message: 'Password must be at least 6 characters long and contain at least one number and one special character' 
+      });
+    }
+
+    // Look up the current HOD making the request
+    const hod = await HOD.findById(req.user._id).select('+password');
+    if (!hod) {
+      return res.status(404).json({ message: 'HOD profile not found' });
+    }
+
+    // Verify that the provided current password matches the one in the database
+    const isMatch = await bcrypt.compare(currentPassword, hod.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Incorrect current password' });
+    }
+
+    // Hash the new password and save it
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+    hod.password = hashedPassword;
+    await hod.save();
+
+    // Send security notification email
+    await notifyPasswordChange(hod);
+
+    res.json({ success: true, message: 'Password updated successfully' });
+  } catch (error) {
+    res.status(500).json({ message: 'Error changing password', error: error.message });
   }
 };
 
