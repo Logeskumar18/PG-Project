@@ -176,9 +176,9 @@ const HODLogin = () => {
                 </Form>
 
                 <div className="text-center mt-4 pt-3 border-top">
-                  {/* <p className="text-muted mb-2">
+                  <p className="text-muted mb-2">
                     Don't have an account? <Link to="/register/hod" className="text-decoration-none fw-semibold">Register as HOD</Link>
-                  </p> */}
+                  </p>
                   <Link to="/" className="text-muted text-decoration-none">← Back to Home</Link>
                 </div>
               </Card.Body>
