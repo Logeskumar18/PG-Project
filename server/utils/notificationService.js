@@ -1,6 +1,5 @@
 import Notification from '../models/Notification.js';
 import Project from '../models/Project.js';
-import Milestone from '../models/Milestone.js';
 import Deadline from '../models/Deadline.js';
 import Announcement from '../models/Announcement.js';
 import Document from '../models/Document.js';

@@ -28,7 +28,6 @@ export const reassignStudentToStaff = async (req, res) => {
 };
 import Project from '../models/Project.js';
 import Document from '../models/Document.js';
-import Milestone from '../models/Milestone.js';
 import Student from '../models/Student.js';
 import Staff from '../models/Staff.js';
 import Announcement from '../models/Announcement.js';

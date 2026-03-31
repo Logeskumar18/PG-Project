@@ -25,7 +25,6 @@ import { spawn } from 'child_process';
 import Project from '../models/Project.js';
 import Student from '../models/Student.js';
 import Document from '../models/Document.js';
-import Milestone from '../models/Milestone.js';
 import Progress from '../models/Progress.js';
 import Meeting from '../models/Meeting.js';
 import multer from 'multer';
