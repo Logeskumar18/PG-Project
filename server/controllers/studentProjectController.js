@@ -419,6 +419,13 @@ export const submitProgress = async (req, res) => {
       nextWeekPlan
     });
 
+    // If progress is 100%, update the project status to 'Completed'
+    if (progressPercentage === 100) {
+      project.status = 'Completed';
+      project.stage = 'Final Submission'; // Update stage as well
+      await project.save();
+    }
+
     // Notify the assigned guide
     // Fetch project with guide populated to ensure we have email for notification
     const projectWithGuide = await Project.findById(projectId).populate('assignedGuideId');

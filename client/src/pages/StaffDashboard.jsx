@@ -117,10 +117,12 @@ const StaffDashboard = () => {
 
   const [studentSearchQuery, setStudentSearchQuery] = useState('');
   const [studentFilter, setStudentFilter] = useState('All');
+  const [progressSearchQuery, setProgressSearchQuery] = useState('');
   const [studentPage, setStudentPage] = useState(1);
 
   const [docPage, setDocPage] = useState(1);
   const [evaluationPage, setEvaluationPage] = useState(1);
+  const [progressPage, setProgressPage] = useState(1);
   const [pageSize, setPageSize] = useState(5);
 
   useEffect(() => {
@@ -129,6 +131,7 @@ const StaffDashboard = () => {
   useEffect(() => { setDocPage(1); }, [docSearchQuery, docFilterStatus, pageSize]);
   useEffect(() => { setStudentPage(1); }, [studentSearchQuery, studentFilter, pageSize]);
   useEffect(() => { setEvaluationPage(1); }, [pageSize]);
+  useEffect(() => { setProgressPage(1); }, [pageSize, progressSearchQuery]);
 
   
   const [showEditProfileModal, setShowEditProfileModal] = useState(false);
@@ -623,6 +626,15 @@ const StaffDashboard = () => {
   const indexOfFirstEval = indexOfLastEval - pageSize;
   const currentEvals = evaluatedProjects.slice(indexOfFirstEval, indexOfLastEval);
   const totalEvalPages = Math.ceil(evaluatedProjects.length / pageSize);
+
+  const filteredProgressUpdates = progressUpdates.filter(progress => 
+    (progress.studentId?.name || '').toLowerCase().includes(progressSearchQuery.toLowerCase())
+  );
+
+  const indexOfLastProgress = progressPage * pageSize;
+  const indexOfFirstProgress = indexOfLastProgress - pageSize;
+  const currentProgressUpdates = filteredProgressUpdates.slice(indexOfFirstProgress, indexOfLastProgress);
+  const totalProgressPages = Math.ceil(filteredProgressUpdates.length / pageSize);
 
   const getDaysRemaining = (dateString) => {
     const deadlineDate = new Date(dateString);
@@ -1525,12 +1537,37 @@ const StaffDashboard = () => {
             <Col lg={12}>
               <Card className="border-0 shadow-sm mb-4">
                 <Card.Body className="p-4">
-                  <h5 className="fw-bold mb-4">📅📅 Weekly Progress Updates</h5>
-                  {progressUpdates.length === 0 ? (
-                    <div className="text-center text-muted py-4">No progress updates yet</div>
+                  <h5 className="fw-bold mb-4">📅 Weekly Progress Updates</h5>
+
+                  {progressUpdates.length > 0 && (
+                    <Row className="mb-4 g-2">
+                      <Col md={6}>
+                        <Form.Control
+                          type="text"
+                          placeholder="Search by student name..."
+                          value={progressSearchQuery}
+                          onChange={(e) => setProgressSearchQuery(e.target.value)}
+                        />
+                      </Col>
+                      <Col md={4}></Col>
+                      <Col md={2}>
+                        <Form.Select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))}>
+                          <option value={5}>5 / page</option>
+                          <option value={10}>10 / page</option>
+                          <option value={20}>20 / page</option>
+                        </Form.Select>
+                      </Col>
+                    </Row>
+                  )}
+
+                  {currentProgressUpdates.length === 0 ? (
+                    <div className="text-center text-muted py-4">
+                      {progressUpdates.length === 0 ? 'No progress updates yet' : 'No matching progress updates found'}
+                    </div>
                   ) : (
-                    <div className="d-flex flex-column gap-3">
-                      {progressUpdates.map(progress => (
+                    <>
+                      <div className="d-flex flex-column gap-3">
+                      {currentProgressUpdates.map(progress => (
                         <div key={progress._id} className="p-3 border rounded-3">
                           <div className="d-flex justify-content-between align-items-start mb-2">
                             <div>
@@ -1568,6 +1605,16 @@ const StaffDashboard = () => {
                         </div>
                       ))}
                     </div>
+                    {totalProgressPages > 1 && (
+                      <div className="d-flex justify-content-center mt-4">
+                        <div className="d-flex gap-2 align-items-center">
+                          <Button variant="outline-primary" size="sm" onClick={() => setProgressPage(prev => Math.max(prev - 1, 1))} disabled={progressPage === 1}>Previous</Button>
+                          <span className="px-2 small fw-semibold">Page {progressPage} of {totalProgressPages}</span>
+                          <Button variant="outline-primary" size="sm" onClick={() => setProgressPage(prev => Math.min(prev + 1, totalProgressPages))} disabled={progressPage === totalProgressPages}>Next</Button>
+                        </div>
+                      </div>
+                    )}
+                    </>
                   )}
                 </Card.Body>
               </Card>

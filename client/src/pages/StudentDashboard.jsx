@@ -13,6 +13,20 @@ import 'react-pdf/dist/Page/TextLayer.css';
 
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+const getStatusBadgeColor = (status) => {
+  switch (status) {
+    case 'Approved':
+    case 'Completed':
+      return 'bg-success';
+    case 'Rejected':
+      return 'bg-danger';
+    case 'Pending':
+      return 'bg-warning';
+    default:
+      return 'bg-info'; // For 'In Progress' etc.
+  }
+};
+
 const STAGES = ['Proposal Submitted', 'Proposal Approved', 'Development', 'Mid Review', 'Testing', 'Final Submission'];
 const StudentDashboard = () => {
   const { user, logout } = useAuth();
@@ -341,12 +355,20 @@ const StudentDashboard = () => {
         nextWeekPlan
       });
 
-      setSuccessMessage('Progress update submitted successfully!');
+      if (progressPercentage === 100) {
+        setSuccessMessage('Progress at 100%! Your project status will now be marked as Completed.');
+      } else {
+        setSuccessMessage('Progress update submitted successfully!');
+      }
+      fetchProject(); // Refresh project data to reflect new status/stage
+
       e.target.reset();
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (error) {
       setSuccessMessage('Error submitting progress: ' + (error.response?.data?.message || error.message));
       setTimeout(() => setSuccessMessage(''), 5000);
+      setErrorMessage('Error submitting progress: ' + (error.response?.data?.message || error.message));
+      setTimeout(() => setErrorMessage(''), 5000);
     }
   };
 
@@ -913,7 +935,13 @@ const StudentDashboard = () => {
                   <div className="d-flex flex-column gap-3">
                     <div className="d-flex justify-content-between p-3 bg-light rounded-3">
                       <span className="fw-semibold">Project Status:</span>
-                      <span className="badge bg-info">{projects.length > 0 ? 'In Progress' : 'Not Started'}</span>
+                      {projects.length > 0 ? (
+                        <span className={`badge ${getStatusBadgeColor(projects[0].approvalStatus || projects[0].status)}`}>
+                          {projects[0].approvalStatus || projects[0].status || 'In Progress'}
+                        </span>
+                      ) : (
+                        <span className="badge bg-secondary">Not Started</span>
+                      )}
                     </div>
                     <div className="d-flex justify-content-between p-3 bg-light rounded-3">
                       <span className="fw-semibold">Documents Uploaded:</span>
@@ -1113,7 +1141,9 @@ const StudentDashboard = () => {
                                     </h5>
                                     <small className="text-muted">Submitted on {project.submissionDate ? new Date(project.submissionDate).toLocaleDateString() : (project.submittedAt ? new Date(project.submittedAt).toLocaleDateString() : 'N/A')}</small>
                                   </div>
-                                  <span className={`badge ${project.approvalStatus === 'Approved' ? 'bg-success' : project.approvalStatus === 'Rejected' ? 'bg-danger' : 'bg-info'}`}>{project.approvalStatus || project.status}</span>
+                                  <span className={`badge ${getStatusBadgeColor(project.approvalStatus || project.status)}`}>
+                                    {project.approvalStatus || project.status || 'In Progress'}
+                                  </span>
                                 </div>
                                 <div className="mb-4">
                                   <h6 className="fw-semibold mb-2">Description:</h6>
