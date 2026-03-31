@@ -33,6 +33,21 @@ router.post('/', protect, authorize('HOD', 'Admin'), async (req, res) => {
   }
 });
 
+
+// Update a deadline (HOD only)
+router.put('/:id', protect, authorize('HOD', 'Admin'), async (req, res) => {
+  try {
+    const updated = await Deadline.findByIdAndUpdate(
+      req.params.id,
+      req.body,
+      { new: true }
+    );
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // Delete a deadline (HOD only)
 router.delete('/:id', protect, authorize('HOD', 'Admin'), async (req, res) => {
   try {
