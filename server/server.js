@@ -24,7 +24,7 @@ const app = express();
 
 
 app.use(cors({
-  origin: "https://pg-project-pink.vercel.app/",
+  origin: "*",
   credentials: true
 }));
 app.use(express.json());
